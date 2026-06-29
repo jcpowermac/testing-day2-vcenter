@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
+	"github.com/jcallen/testing-day2-vcenter/pkg/labconfig"
 	"github.com/jcallen/testing-day2-vcenter/pkg/vsphere"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -22,6 +23,8 @@ var (
 	infraBackup *configv1.Infrastructure
 	gateEnabled bool
 	vapDryRunWorks bool
+	labCfg      *labconfig.LabConfig
+	labCfgPath  string
 )
 
 func TestE2E(t *testing.T) {
@@ -55,6 +58,12 @@ var _ = BeforeSuite(func() {
 
 	vapDryRunWorks = probeVAPDryRun()
 	GinkgoWriter.Printf("VSphereMultiVCenterDay2 enabled=%v vapDryRunWorks=%v\n", gateEnabled, vapDryRunWorks)
+
+	if cfg, path, err := labconfig.LoadFromEnv(); err == nil {
+		labCfg = cfg
+		labCfgPath = path
+		GinkgoWriter.Printf("loaded lab config from %s (vCenter2=%s)\n", path, cfg.SecondVCenter.Server)
+	}
 })
 
 var _ = AfterSuite(func() {
@@ -74,6 +83,19 @@ func requireGateDisabled() {
 	if gateEnabled {
 		Skip("VSphereMultiVCenterDay2 feature gate is enabled; gate-off coverage delegated to openshift/api fixtures")
 	}
+}
+
+func requireLabConfig() *labconfig.LabConfig {
+	if labCfg != nil {
+		return labCfg
+	}
+	cfg, path, err := labconfig.LoadFromEnv()
+	if err != nil {
+		Skip(err.Error())
+	}
+	labCfg = cfg
+	labCfgPath = path
+	return labCfg
 }
 
 func currentInfrastructure() *configv1.Infrastructure {

@@ -29,6 +29,9 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 
 	Context("mutating sequences", func() {
 		It("should add and remove a temporary vCenter without leaving stale cloud config (#469)", func() {
+			if labCfg != nil {
+				Skip("lab config present; use make apply-lab / make test-real / make restore-lab for real vCenter testing")
+			}
 			requireGateEnabled()
 			infra := currentInfrastructure()
 			if len(framework.GetVCenters(infra)) >= 3 {

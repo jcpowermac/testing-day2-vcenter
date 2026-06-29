@@ -1,0 +1,27 @@
+# Copy to config/lab.yaml and fill in your real second vCenter details.
+# config/lab.yaml is gitignored — do not commit credentials.
+
+stateDir: .lab-state
+
+secondVCenter:
+  server: vcenter2.lab.example.com
+  port: 443
+  datacenters:
+    - DC2
+  username: admin@vsphere.local
+  # Use password OR passwordFile (recommended)
+  password: "change-me"
+  # passwordFile: /run/secrets/vcenter2-password
+
+# Optional but recommended for full Day 2 topology testing
+failureDomain:
+  name: fd-vcenter2
+  region: openshift-region-vc2
+  zone: openshift-zone-vc2
+  topology:
+    computeCluster: /DC2/host/cluster1
+    datacenter: DC2
+    datastore: /DC2/datastore/default
+    networks:
+      - VM Network
+    resourcePool: /DC2/host/cluster1/Resources
