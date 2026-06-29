@@ -43,6 +43,16 @@ func FindFailureDomainByRegionZone(fds []configv1.VSpherePlatformFailureDomainSp
 	return nil
 }
 
+// FindFailureDomainByName finds a failure domain by its Name field.
+func FindFailureDomainByName(fds []configv1.VSpherePlatformFailureDomainSpec, name string) *configv1.VSpherePlatformFailureDomainSpec {
+	for i := range fds {
+		if fds[i].Name == name {
+			return &fds[i]
+		}
+	}
+	return nil
+}
+
 // RemoveFailureDomainByRegionZone returns a copy of failure domains with one region/zone removed.
 func RemoveFailureDomainByRegionZone(fds []configv1.VSpherePlatformFailureDomainSpec, region, zone string) []configv1.VSpherePlatformFailureDomainSpec {
 	out := make([]configv1.VSpherePlatformFailureDomainSpec, 0, len(fds))

@@ -43,6 +43,24 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			expectFailureDomainRemovalDenied(infra, region, zone)
 		})
 
+		It("should deny removing a failure domain referenced by a CPMS (N-SEQ-02)", func() {
+			infra := currentInfrastructure()
+			region, zone, ok := findCPMSBackedFailureDomain(infra)
+			if !ok {
+				Skip("no CPMS-backed failure domain found")
+			}
+			expectFailureDomainRemovalDenied(infra, region, zone)
+		})
+
+		It("should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)", func() {
+			infra := currentInfrastructure()
+			region, zone, ok := findMachineSetBackedFailureDomain(infra)
+			if !ok {
+				Skip("no MachineSet-backed failure domain found")
+			}
+			expectFailureDomainRemovalDenied(infra, region, zone)
+		})
+
 		It("should allow removing an unreferenced failure domain via dry-run", func() {
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)

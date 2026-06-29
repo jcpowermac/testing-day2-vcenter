@@ -252,6 +252,40 @@ func expectFailureDomainRemovalDenied(infra *configv1.Infrastructure, region, zo
 	))
 }
 
+func findCPMSBackedFailureDomain(infra *configv1.Infrastructure) (region, zone string, found bool) {
+	fds := framework.GetFailureDomains(infra)
+	fdByName := map[string]configv1.VSpherePlatformFailureDomainSpec{}
+	for _, fd := range fds {
+		fdByName[fd.Name] = fd
+	}
+	for _, cpms := range listCPMS() {
+		for _, name := range framework.CPMSVSphereFailureDomainNames(&cpms) {
+			if fd, ok := fdByName[name]; ok {
+				return fd.Region, fd.Zone, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func findMachineSetBackedFailureDomain(infra *configv1.Infrastructure) (region, zone string, found bool) {
+	fds := framework.GetFailureDomains(infra)
+	for _, ms := range listMachineSets() {
+		if ms.Spec.Template.Labels == nil {
+			continue
+		}
+		r := ms.Spec.Template.Labels[framework.MachineRegionLabel]
+		z := ms.Spec.Template.Labels[framework.MachineZoneLabel]
+		if r == "" || z == "" {
+			continue
+		}
+		if vsphere.FindFailureDomainByRegionZone(fds, r, z) != nil {
+			return r, z, true
+		}
+	}
+	return "", "", false
+}
+
 func managedCloudConfigYAML() string {
 	cm, err := framework.GetConfigMap(suiteCtx, clients.Kube, framework.ManagedConfigNamespace, framework.ManagedConfigName)
 	if err != nil {

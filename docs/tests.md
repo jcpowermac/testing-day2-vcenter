@@ -30,6 +30,8 @@
 
 - **should install vSphere failure domain VAP resources** — Verifies all three VAPs (machine, cpms, machineset) and their bindings exist on the cluster.
 - **should deny removing a failure domain referenced by a Machine (N-SEQ-01)** — Removes a failure domain whose region/zone matches a Machine's labels and expects the VAP to deny.
+- **should deny removing a failure domain referenced by a CPMS (N-SEQ-02)** — Removes a failure domain whose name matches a CPMS failure domain reference and expects the VAP to deny.
+- **should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)** — Removes a failure domain whose region/zone matches a MachineSet's template labels and expects the VAP to deny.
 - **should allow removing an unreferenced failure domain via dry-run** — Finds a failure domain not referenced by any Machine and confirms removal is accepted.
 
 ### Gate disabled
@@ -57,19 +59,51 @@
 - **should expose cloud-conf for CCM consumption** — Confirms the CCM ConfigMap exists with the `cloud.conf` data key.
 - **should recreate kube-cloud-config if deleted when gate is enabled (N-OP-07)** — Deletes the managed ConfigMap and expects the config-operator to recreate it within the default timeout. Restores the original on cleanup.
 
-## Operator Health (`operator_health_test.go`) [readonly, operator, p0]
+## Credential Propagation (`credentials_test.go`) [readonly, integration, p0]
+
+- **should have credential secrets for all Infrastructure vCenters** — Iterates all 4 credential consumer secrets and confirms each has key entries prefixed with every Infrastructure vCenter server.
+- **should have {namespace}/{name} with entries for every vCenter** — Per-secret specs that verify each consumer secret individually, skipping if the secret doesn't exist on the cluster.
+
+## Machine Integration (`machine_integration_test.go`) [readonly, integration, p0]
+
+- **should have all worker Machines in a healthy phase** — Confirms every non-deleting Machine is in Running or Provisioned phase.
+- **should label every Machine with region and zone** — Checks that every Machine has non-empty `machine.openshift.io/region` and `machine.openshift.io/zone` labels.
+- **should map every Machine to a valid Infrastructure failure domain** — Cross-references Machine region/zone labels against Infrastructure failure domains.
+- **should have Machine providerSpec workspace matching Infrastructure topology** — Confirms each Machine's workspace datacenter matches its labeled failure domain's topology.
+
+## CPMS Integration (`cpms_integration_test.go`) [readonly, integration, p0]
+
+- **should reference failure domain names that exist in Infrastructure** — Confirms every failure domain name referenced in the CPMS spec exists in the Infrastructure CR.
+- **should have CPMS failure domains covering all Infrastructure FDs** — Logs which Infrastructure FDs are not referenced by the CPMS (informational, may be worker-only).
+
+## MachineSet Integration (`machineset_integration_test.go`) [readonly, integration, p0]
+
+- **should have providerSpec workspace matching an Infrastructure FD topology** — Confirms each MachineSet's workspace datacenter maps to a known Infrastructure failure domain.
+- **should have MachineSet template labels matching Infrastructure failure domains** — Checks that region/zone labels on MachineSet templates correspond to existing failure domains.
+
+## CSI Driver Integration (`csi_integration_test.go`) [readonly, integration, p1]
+
+- **should have CSI driver credential secret with entries for all vCenters** — Verifies `openshift-cluster-csi-drivers/vmware-vsphere-cloud-credentials` has key entries for every Infrastructure vCenter.
+- **should have CSI driver pods running** — Confirms CSI driver controller pods are in Running phase.
+- **should have managed cloud config listing all vCenter datacenters for CSI** — On multi-vCenter clusters, validates the managed cloud config includes all vCenters for CSI consumption.
+
+## Operator Health (`operator_health_test.go`) [readonly, operator, p0/p1]
 
 - **should keep ClusterOperator/{name} Available and not Degraded** — For each of `cloud-controller-manager`, `config-operator`, and `machine-api`, confirms Available=True and Degraded=False.
+- **should not have CCM pods in a crash loop** — Confirms CCM pods have fewer than 5 restarts.
+- **should not have MAO pods in a crash loop** — Confirms MAO pods have fewer than 5 restarts.
+- **should not have CSI driver pods in a crash loop** — Confirms vSphere CSI driver controller pods have fewer than 5 restarts.
 
 ## vsphere-problem-detector (`problem_detector_test.go`) [readonly, operator, p1]
 
 - **should keep ClusterOperator/vsphere-problem-detector Available when installed** — If the vsphere-problem-detector ClusterOperator exists, confirms it is Available.
 - **should validate GetVCenter behavior after failure domain removal when #224 merges** — Placeholder for future testing of vsphere-problem-detector#224 (N-CFG-08). Currently skipped.
 
-## Topology Lifecycle (`topology_lifecycle_test.go`) [mutating, p0]
+## Topology Lifecycle (`topology_lifecycle_test.go`) [mutating, p0/p1]
 
 - **should deny removing a failure domain that still has Machines (N-SEQ-05 precheck)** — Dry-run removes a Machine-backed failure domain and expects the VAP to deny the update.
 - **should deny removing a vCenter referenced by a failure domain (N-SEQ-04)** — Removes a vCenter while its failure domain remains. Currently fails intentionally because no xValidation rule enforces this (SPLAT-2827).
+- **should deny removing an FD referenced by a 0-replica MachineSet** — Creates a 0-replica MachineSet with region/zone labels, then attempts to remove the corresponding FD. Expects the MachineSet VAP to deny. Cleans up the MachineSet on exit.
 - **should add and remove a temporary vCenter without leaving stale cloud config (#469)** — Adds a fake vCenter, waits for cloud config reconciliation, removes it, then confirms no stale entries remain. Restores Infrastructure on cleanup.
 
 ## Real vCenter Day 2 (`real_vcenter_test.go`) [real-vcenter, p0, mutating]
@@ -78,3 +112,6 @@
 - **should reflect configured vCenter in managed cloud config** — Parses managed cloud config and validates it includes all Infrastructure vCenters with no stale entries.
 - **should pass lab verification helper** — Runs the full `lab.Verify` workflow against the live cluster.
 - **should include failure domain when configured** — When lab config includes a failure domain, confirms it exists in the Infrastructure CR with the correct server reference.
+- **should have credential secrets updated with second vCenter entries** — After Day 2 add, confirms all 4 credential consumer secrets have entries for the second vCenter.
+- **should keep all operators healthy after Day 2 add** — Confirms cloud-controller-manager, config-operator, and machine-api are Available after the real vCenter was added.
+- **should have CCM cloud config reflecting second vCenter** — Parses the CCM cloud config and confirms the second vCenter server appears.

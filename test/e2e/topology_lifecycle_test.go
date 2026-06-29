@@ -37,6 +37,29 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 		})
 	})
 
+	Context("active MachineSet VAP test", Label("p1"), func() {
+		It("should deny removing an FD referenced by a 0-replica MachineSet", func() {
+			requireGateEnabled()
+			infra := currentInfrastructure()
+			fds := framework.GetFailureDomains(infra)
+			if len(fds) == 0 {
+				Skip("no failure domains configured")
+			}
+
+			fd := fds[0]
+			msName := "e2e-vap-probe-ms"
+			ms := framework.BuildMachineSet(msName, framework.MachineAPINamespace, fd.Region, fd.Zone)
+
+			created, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(func() {
+				_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, created.Name)
+			})
+
+			expectFailureDomainRemovalDenied(infra, fd.Region, fd.Zone)
+		})
+	})
+
 	Context("mutating sequences", func() {
 		It("should add and remove a temporary vCenter without leaving stale cloud config (#469)", func() {
 			if labCfg != nil {

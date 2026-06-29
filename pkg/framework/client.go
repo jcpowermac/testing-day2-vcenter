@@ -7,6 +7,7 @@ import (
 
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	machineclient "github.com/openshift/client-go/machine/clientset/versioned"
+	operatorclient "github.com/openshift/client-go/operator/clientset/versioned"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -19,6 +20,7 @@ type Clients struct {
 	Kube      kubernetes.Interface
 	Config    configclient.Interface
 	Machine   machineclient.Interface
+	Operator  operatorclient.Interface
 	Dynamic   dynamic.Interface
 	Discovery discovery.DiscoveryInterface
 	Rest      *rest.Config
@@ -46,6 +48,11 @@ func NewClients() (*Clients, error) {
 		return nil, fmt.Errorf("machine client: %w", err)
 	}
 
+	operator, err := operatorclient.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("operator client: %w", err)
+	}
+
 	dyn, err := dynamic.NewForConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("dynamic client: %w", err)
@@ -60,6 +67,7 @@ func NewClients() (*Clients, error) {
 		Kube:      kube,
 		Config:    config,
 		Machine:   machine,
+		Operator:  operator,
 		Dynamic:   dyn,
 		Discovery: disc,
 		Rest:      cfg,

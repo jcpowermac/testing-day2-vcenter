@@ -25,4 +25,40 @@ var _ = Describe("Operator health", Label("readonly", "operator", "p0"), func() 
 			Expect(degraded.Status).To(Equal(configv1.ConditionFalse))
 		})
 	}
+
+	It("should not have CCM pods in a crash loop", Label("p1"), func() {
+		pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube, framework.CCMConfigNamespace, "k8s-app=cloud-controller-manager")
+		if err != nil || len(pods) == 0 {
+			Skip("CCM pods not found")
+		}
+		for _, pod := range pods {
+			restarts := framework.PodRestartCount(&pod)
+			Expect(restarts).To(BeNumerically("<", 5),
+				"CCM pod %s has %d restarts, possible crash loop", pod.Name, restarts)
+		}
+	})
+
+	It("should not have MAO pods in a crash loop", Label("p1"), func() {
+		pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube, framework.MachineAPINamespace, "k8s-app=machine-api-operator")
+		if err != nil || len(pods) == 0 {
+			Skip("MAO pods not found")
+		}
+		for _, pod := range pods {
+			restarts := framework.PodRestartCount(&pod)
+			Expect(restarts).To(BeNumerically("<", 5),
+				"MAO pod %s has %d restarts, possible crash loop", pod.Name, restarts)
+		}
+	})
+
+	It("should not have CSI driver pods in a crash loop", Label("p1"), func() {
+		pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube, "openshift-cluster-csi-drivers", "app=vmware-vsphere-csi-driver-controller")
+		if err != nil || len(pods) == 0 {
+			Skip("vSphere CSI driver pods not found")
+		}
+		for _, pod := range pods {
+			restarts := framework.PodRestartCount(&pod)
+			Expect(restarts).To(BeNumerically("<", 5),
+				"CSI pod %s has %d restarts, possible crash loop", pod.Name, restarts)
+		}
+	})
 })

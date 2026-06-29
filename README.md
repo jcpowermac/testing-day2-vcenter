@@ -63,7 +63,7 @@ failureDomain:   # optional but recommended
    - Credential secrets that exist on vSphere clusters (typically `kube-system/vsphere-creds`, optionally `openshift-machine-api/vsphere-cloud-credentials`)
 2. Merges credentials for the new vCenter into those secrets and `cloud-provider-config`
 3. Patches `Infrastructure/cluster` to append the vCenter (and optional failure domain)
-4. Waits for `cloud-controller-manager`, `cluster-config-operator`, and `machine-api` to recover
+4. Waits for `cloud-controller-manager`, `config-operator`, and `machine-api` to recover
 
 ### CLI (same as Makefile)
 
@@ -113,6 +113,8 @@ test/e2e/                 # Ginkgo suites
 
 ## Related docs
 
+- [Test catalog](./docs/tests.md) — one-line description of every test spec
+- [Coverage gap plan](./plans/coverage-gap-plan.md) — PR-to-test coverage matrix and implementation plan
 - [Risk assessment](./vsphere-multi-vcenter-day2-risk-assessment.md)
 - [Gap analysis](./vsphere-multi-vcenter-day2-gap-analysis.md)
 - [Negative testing plan](./vsphere-multi-vcenter-day2-negative-testing.md)
