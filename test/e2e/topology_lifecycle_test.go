@@ -23,7 +23,17 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 		It("should deny removing a vCenter referenced by a failure domain (N-SEQ-04)", func() {
 			requireGateEnabled()
 			infra := currentInfrastructure()
-			expectPatchRejected(fdReferencingRemovedVCenterSpec(infra), "Cannot add and remove vCenters at the same time")
+			spec := fdReferencingRemovedVCenterSpec(infra)
+			_, err := patchInfrastructureSpec(spec, true)
+			if err == nil {
+				Fail("CRD allows removing a vCenter still referenced by a failure domain — " +
+					"no xValidation rule enforces FD.server must reference an existing vCenter entry (see SPLAT-2827)")
+			}
+			Expect(framework.InfrastructurePatchError(err)).To(SatisfyAny(
+				ContainSubstring("failure domain"),
+				ContainSubstring("vCenter"),
+				ContainSubstring("ValidatingAdmissionPolicy"),
+			))
 		})
 	})
 

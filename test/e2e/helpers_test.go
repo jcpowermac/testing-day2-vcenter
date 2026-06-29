@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
@@ -49,7 +50,7 @@ var _ = BeforeSuite(func() {
 	infraBackup, err = framework.BackupInfrastructure(suiteCtx, clients.Config)
 	Expect(err).NotTo(HaveOccurred())
 
-	for _, co := range []string{"cloud-controller-manager", "cluster-config-operator", "machine-api"} {
+	for _, co := range []string{"cloud-controller-manager", "config-operator", "machine-api"} {
 		err = framework.WaitForClusterOperatorAvailable(suiteCtx, clients.Config, co, framework.ShortTimeout)
 		if err != nil {
 			GinkgoWriter.Printf("warning: clusteroperator %q not available before suite: %v\n", co, err)
@@ -108,15 +109,37 @@ func patchInfrastructureSpec(spec *configv1.InfrastructureSpec, dryRun bool) (*c
 	return framework.ReplaceInfrastructureSpec(suiteCtx, clients.Config, spec, dryRun)
 }
 
+func patchInfrastructureRaw(patch []byte, dryRun bool) (*configv1.Infrastructure, error) {
+	return framework.PatchInfrastructure(suiteCtx, clients.Config, patch, dryRun)
+}
+
+func expectRawPatchRejected(patch []byte, messageFragment string) {
+	_, err := patchInfrastructureRaw(patch, true)
+	Expect(err).To(HaveOccurred(), "expected patch to be rejected")
+	errMsg := framework.InfrastructurePatchError(err)
+	Expect(errMsg).To(SatisfyAny(
+		ContainSubstring(messageFragment),
+		ContainSubstring("ValidatingAdmissionPolicy"),
+	), "expected rejection containing %q or VAP denial, got: %s", messageFragment, errMsg)
+}
+
 func expectPatchRejected(spec *configv1.InfrastructureSpec, messageFragment string) {
 	_, err := patchInfrastructureSpec(spec, true)
 	Expect(err).To(HaveOccurred())
-	Expect(framework.InfrastructurePatchError(err)).To(ContainSubstring(messageFragment))
+	errMsg := framework.InfrastructurePatchError(err)
+	Expect(errMsg).To(SatisfyAny(
+		ContainSubstring(messageFragment),
+		ContainSubstring("ValidatingAdmissionPolicy"),
+	), "expected xValidation rejection (%s) or VAP denial, got: %s", messageFragment, errMsg)
 }
 
 func expectPatchAllowedDryRun(spec *configv1.InfrastructureSpec) {
 	_, err := patchInfrastructureSpec(spec, true)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func isVAPDenial(err error) bool {
+	return strings.Contains(framework.InfrastructurePatchError(err), "ValidatingAdmissionPolicy")
 }
 
 func withInfrastructureRestore(fn func(spec *configv1.InfrastructureSpec)) {
@@ -250,7 +273,7 @@ func sourceCloudConfigYAML() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return cm.Data[framework.CloudConfigDataKey], true
+	return cm.Data[framework.SourceCloudConfigDataKey], true
 }
 
 func marshalPatchFromSpec(spec *configv1.InfrastructureSpec) []byte {

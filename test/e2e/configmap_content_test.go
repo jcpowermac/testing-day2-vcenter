@@ -62,6 +62,6 @@ var _ = Describe("Cloud config content", Label("readonly", "config", "p0"), func
 		if cfg.Nodes == nil {
 			Skip("nodes section not configured on this cluster")
 		}
-		Expect(cfg.Nodes.NetworkCIDR != "" || cfg.Nodes.NetworkName != "").To(BeTrue())
+		Expect(cfg.Nodes.ExternalNetworkSubnetCidr != "" || cfg.Nodes.InternalNetworkSubnetCidr != "").To(BeTrue())
 	})
 })

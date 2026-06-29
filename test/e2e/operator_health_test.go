@@ -10,12 +10,11 @@ import (
 var _ = Describe("Operator health", Label("readonly", "operator", "p0"), func() {
 	operators := []string{
 		"cloud-controller-manager",
-		"cluster-config-operator",
+		"config-operator",
 		"machine-api",
 	}
 
 	for _, name := range operators {
-		name := name
 		It("should keep ClusterOperator/"+name+" Available and not Degraded", func() {
 			available, err := framework.GetClusterOperatorCondition(suiteCtx, clients.Config, name, configv1.OperatorAvailable)
 			Expect(err).NotTo(HaveOccurred())

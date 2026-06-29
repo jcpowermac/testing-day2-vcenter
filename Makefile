@@ -38,7 +38,7 @@ test-mutating:
 
 test-real:
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
-	E2E_LAB_CONFIG=$(CONFIG) $(GINKGO) --label-filter="real-vcenter" ./test/e2e/
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) --label-filter="real-vcenter" ./test/e2e/
 
 # Full real-vCenter workflow: apply, verify tests, restore
 day2-lab: apply-lab test-real restore-lab

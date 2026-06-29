@@ -152,7 +152,7 @@ func Restore(ctx context.Context, clients *framework.Clients, stateDir string) e
 func Verify(ctx context.Context, clients *framework.Clients, cfg *labconfig.LabConfig) error {
 	if err := framework.CheckOperatorsNotDegraded(ctx, clients.Config, []string{
 		"cloud-controller-manager",
-		"cluster-config-operator",
+		"config-operator",
 		"machine-api",
 	}); err != nil {
 		return err
@@ -203,7 +203,7 @@ func updateCredentials(ctx context.Context, clients *framework.Clients, infra *c
 	if err != nil {
 		return err
 	}
-	mergedConfig, err := mergeCloudProviderConfig(cm.Data[framework.CloudConfigDataKey], infra, cfg.SecondVCenter)
+	mergedConfig, err := mergeCloudProviderConfig(cm.Data[framework.SourceCloudConfigDataKey], infra, cfg.SecondVCenter)
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func updateCredentials(ctx context.Context, clients *framework.Clients, infra *c
 	if cmUpdate.Data == nil {
 		cmUpdate.Data = map[string]string{}
 	}
-	cmUpdate.Data[framework.CloudConfigDataKey] = mergedConfig
+	cmUpdate.Data[framework.SourceCloudConfigDataKey] = mergedConfig
 	if _, err := clients.Kube.CoreV1().ConfigMaps(cmUpdate.Namespace).Update(ctx, cmUpdate, metav1.UpdateOptions{}); err != nil {
 		return fmt.Errorf("update cloud-provider-config: %w", err)
 	}
@@ -269,7 +269,7 @@ func vsphereHasServer(infra *configv1.Infrastructure, server string) bool {
 }
 
 func waitForOperators(ctx context.Context, clients *framework.Clients) error {
-	for _, name := range []string{"cloud-controller-manager", "cluster-config-operator", "machine-api"} {
+	for _, name := range []string{"cloud-controller-manager", "config-operator", "machine-api"} {
 		if err := framework.WaitForClusterOperatorAvailable(ctx, clients.Config, name, framework.DefaultTimeout); err != nil {
 			return fmt.Errorf("wait for clusteroperator %q: %w", name, err)
 		}

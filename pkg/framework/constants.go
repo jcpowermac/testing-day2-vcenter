@@ -19,7 +19,8 @@ const (
 	CCMConfigName          = "cloud-conf"
 	MachineAPINamespace    = "openshift-machine-api"
 
-	CloudConfigDataKey = "config"
+	CloudConfigDataKey        = "cloud.conf"
+	SourceCloudConfigDataKey  = "config"
 
 	VAPMachineFailureDomainName    = "vsphere-failure-domain-in-use-by-machine"
 	VAPCPMSFailureDomainName       = "vsphere-failure-domain-in-use-by-cpms"

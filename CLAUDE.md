@@ -1,0 +1,83 @@
+# testing-day2-vcenter
+
+QA/QE test suite for the OpenShift vSphere Multi-vCenter Day 2 feature (`VSphereMultiVCenterDay2` feature gate). Tests are Ginkgo v2 / Gomega e2e tests designed to run against a live OpenShift cluster.
+
+## Build & Test
+
+```bash
+make build                # compile all packages
+make vet                  # go vet
+make test-readonly        # run readonly e2e tests (safe, no cluster mutation)
+make test-p0              # run p0 readonly tests only
+make test-mutating        # run mutating tests (changes cluster state, restores after)
+make test-real            # run tests requiring a real second vCenter (needs config/lab.yaml)
+make apply-lab            # add second vCenter to cluster using lab config
+make restore-lab          # revert cluster to pre-apply state
+make verify-lab           # verify second vCenter was added correctly
+```
+
+All e2e tests require `KUBECONFIG` pointing at a vSphere-platform OpenShift cluster.
+
+## Remote Testing
+
+The test cluster is accessed via SSH. The workflow is:
+1. Edit code locally
+2. `rsync -az --delete --exclude='.git' ./ jcallen@10.38.201.171:~/Development/testing-day2-vcenter/`
+3. `ssh jcallen@10.38.201.171 'KUBECONFIG=$HOME/before-installer-testing/vsphere-ipi/auth/kubeconfig make -C ~/Development/testing-day2-vcenter test-readonly'`
+
+Always use `make -C <path> <target>` when running remotely.
+
+## Project Layout
+
+```
+cmd/day2-vcenter/       CLI tool for apply/restore/verify lab operations
+pkg/framework/          Kubernetes/OpenShift client helpers, constants, CR operations
+pkg/lab/                Lab apply/restore/verify workflow, credential management
+pkg/labconfig/          Lab YAML config loading and validation
+pkg/vsphere/            vSphere types, cloud config parser, Infrastructure spec helpers
+test/e2e/               Ginkgo e2e test suites
+  helpers_test.go       BeforeSuite, shared test utilities, spec builders
+  infrastructure_validation_test.go   xValidation tests (N-INF-*)
+  vap_test.go           ValidatingAdmissionPolicy tests (N-SEQ-*)
+  configmap_content_test.go           Cloud config format/parity tests
+  configmap_ownership_test.go         ConfigMap ownership migration tests
+  operator_health_test.go             ClusterOperator health checks
+  topology_lifecycle_test.go          Mutating lifecycle tests
+  real_vcenter_test.go                Tests requiring real second vCenter
+  problem_detector_test.go            vsphere-problem-detector tests (stub)
+config/lab.yaml.example Lab config template
+plans/                  Test plan documents
+```
+
+## Key Constants (pkg/framework/constants.go)
+
+- Source ConfigMap: `openshift-config/cloud-provider-config`, data key `config`
+- Managed ConfigMap: `openshift-config-managed/kube-cloud-config`, data key `cloud.conf`
+- CCM ConfigMap: `openshift-cloud-controller-manager/cloud-conf`, data key `cloud.conf`
+- ClusterOperators checked: `cloud-controller-manager`, `config-operator`, `machine-api`
+- Feature gate: `VSphereMultiVCenterDay2`
+
+## Test Labels
+
+- `readonly` — safe to run, no cluster mutation (uses server-side dry-run)
+- `mutating` — modifies cluster state (backup/restore around each test)
+- `p0`, `p1`, `p2` — priority tiers
+- `validation` — xValidation (CRD CEL rules) tests
+- `admission` — ValidatingAdmissionPolicy tests
+- `config` — cloud config content tests
+- `operator` — ClusterOperator health tests
+- `real-vcenter` — requires lab config with real second vCenter
+
+## Known Issues
+
+### VAP blocks all Infrastructure updates when Machine labels don't match Infrastructure FDs
+The `vsphere-failure-domain-in-use-by-machine` VAP checks Machine labels (`machine.openshift.io/region`, `machine.openshift.io/zone`) against the proposed Infrastructure spec. If any Machine has region/zone labels that don't correspond to a failure domain in the spec, the VAP denies the update — even identity patches or adding a new vCenter. These labels are set from vCenter tags. On clusters where vCenter tags are out of sync with Infrastructure FD region/zone values, this blocks all day-2 operations. Three readonly tests currently fail due to this on the test cluster.
+
+### Cloud config YAML field names
+The cloud config `nodes` section uses camelCase YAML keys (`externalNetworkSubnetCidr`, `internalNetworkSubnetCidr`), not kebab-case. The `NodesConfig` struct in `pkg/vsphere/cloud_config.go` must match.
+
+## Gotchas
+
+- The ClusterOperator is named `config-operator`, NOT `cluster-config-operator`.
+- `ReplaceInfrastructureSpec` uses JSON merge patch — arrays are replaced entirely, not merged element-wise. When the VAP diffs old vs new, it sees the full array replacement.
+- `expectPatchRejected` accepts either xValidation or VAP error messages via `SatisfyAny`, since both admission layers can reject the same bad spec.

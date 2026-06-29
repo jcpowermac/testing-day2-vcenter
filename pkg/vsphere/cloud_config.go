@@ -27,8 +27,8 @@ type VCenterConfig struct {
 
 // NodesConfig holds node network settings when present.
 type NodesConfig struct {
-	NetworkName string `yaml:"network-name,omitempty"`
-	NetworkCIDR string `yaml:"network-cidr,omitempty"`
+	ExternalNetworkSubnetCidr string `yaml:"externalNetworkSubnetCidr,omitempty"`
+	InternalNetworkSubnetCidr string `yaml:"internalNetworkSubnetCidr,omitempty"`
 }
 
 // ParseCloudConfigYAML parses vSphere cloud provider config YAML/INI-like YAML content.

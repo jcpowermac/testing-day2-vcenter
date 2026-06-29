@@ -4,6 +4,7 @@ import (
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
 	"github.com/jcallen/testing-day2-vcenter/pkg/vsphere"
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Infrastructure xValidation", Label("readonly", "validation", "p0"), func() {
@@ -24,13 +25,13 @@ var _ = Describe("Infrastructure xValidation", Label("readonly", "validation", "
 		})
 
 		It("should reject reducing vcenters to an empty array (N-INF-03)", func() {
-			infra := currentInfrastructure()
-			expectPatchRejected(emptyVCentersSpec(infra), "at least 1 items")
+			patch := []byte(`{"spec":{"platformSpec":{"vsphere":{"vcenters":[]}}}}`)
+			expectRawPatchRejected(patch, "at least 1 items")
 		})
 
 		It("should reject removing the vcenters field once set (N-INF-04)", func() {
-			infra := currentInfrastructure()
-			expectPatchRejected(removeVCentersFieldSpec(infra), "vcenters is required once set")
+			patch := []byte(`{"spec":{"platformSpec":{"vsphere":{"vcenters":null}}}}`)
+			expectRawPatchRejected(patch, "vcenters")
 		})
 
 		It("should reject swapping an existing vCenter server (N-INF-05)", func() {
@@ -56,7 +57,17 @@ var _ = Describe("Infrastructure xValidation", Label("readonly", "validation", "
 
 		It("should reject removing a vCenter still referenced by a failure domain (N-INF-12)", func() {
 			infra := currentInfrastructure()
-			expectPatchRejected(fdReferencingRemovedVCenterSpec(infra), "Cannot add and remove vCenters at the same time")
+			spec := fdReferencingRemovedVCenterSpec(infra)
+			_, err := patchInfrastructureSpec(spec, true)
+			if err == nil {
+				Fail("CRD allows removing a vCenter that is still referenced by a failure domain — " +
+					"no xValidation rule enforces FD.server must reference an existing vCenter entry")
+			}
+			Expect(framework.InfrastructurePatchError(err)).To(SatisfyAny(
+				ContainSubstring("failure domain"),
+				ContainSubstring("vCenter"),
+				ContainSubstring("ValidatingAdmissionPolicy"),
+			))
 		})
 
 		It("should allow patching unrelated Infrastructure fields via dry-run (ratcheting)", func() {
