@@ -45,22 +45,8 @@ Gate-disabled tests will always skip on GA clusters where the gate cannot be tur
 | VAP existence | Gate enabled — checks all 3 VAPs installed |
 | N-SEQ-01 (Machine VAP) | At least one Machine with `machine.openshift.io/region` and `machine.openshift.io/zone` labels matching an Infrastructure failure domain |
 | N-SEQ-02 (CPMS VAP) | A CPMS with failure domain names referencing Infrastructure FDs |
-| N-SEQ-03 (MachineSet VAP) | A MachineSet with region/zone labels in `.spec.template.labels`. **Skips on clusters where MachineSets were created before multi-FD was configured** — the installer doesn't retroactively add region/zone labels to existing MachineSets |
-| 0-replica MachineSet VAP (mutating) | At least one existing MachineSet (clones its providerSpec), gate enabled |
-
-**How to unskip N-SEQ-03:** The MachineSet `jcallen3-478bc-worker-0` has no region/zone template labels. To make this test run:
-
-```bash
-# Patch the MachineSet template labels (does NOT affect running Machines)
-kubectl patch machineset jcallen3-478bc-worker-0 -n openshift-machine-api --type merge -p '{
-  "spec": {"template": {"metadata": {"labels": {
-    "machine.openshift.io/region": "mx-central",
-    "machine.openshift.io/zone": "mx-central-1a"
-  }}}}
-}'
-```
-
-This adds region/zone labels to the MachineSet template so the VAP will evaluate it. Existing Machines are unaffected (labels are set at Machine creation time).
+| N-SEQ-03 (MachineSet VAP) | Mutating — creates a 1-replica MachineSet with region/zone labels, waits for Machine to provision, then tests VAP denial. Needs at least one existing MachineSet to clone providerSpec from |
+| Scaled MachineSet VAP (mutating) | Same as N-SEQ-03 — creates a 1-replica MachineSet, waits for Machine, tests VAP denial |
 
 ### Infrastructure xValidation Tests
 
@@ -120,7 +106,7 @@ Require `config/lab.yaml` (or `E2E_LAB_CONFIG` env var) pointing to a valid lab 
 
 ### vsphere-problem-detector Tests
 
-Require the `vsphere-problem-detector` ClusterOperator to exist. **This CO was removed in OCP 5.0** — these tests will always skip on 5.0+ clusters.
+Require the `vsphere-problem-detector-operator` deployment in `openshift-cluster-storage-operator` namespace. VPD runs under the `storage` ClusterOperator, not as its own CO.
 
 ## Expected Skip Summary (Current Cluster)
 
@@ -128,11 +114,9 @@ On this OCP 5.0 cluster with gate enabled, 2 vCenters, and pre-multi-FD MachineS
 
 | Skipped Test | Reason | Fix |
 |---|---|---|
-| N-SEQ-03 MachineSet VAP | MachineSet lacks region/zone labels | Patch MachineSet (see above) |
 | VAP gate-disabled | Gate is always on in GA | Needs pre-4.18 cluster |
 | N-INF-09 gate-disabled | Gate is always on in GA | Needs pre-4.18 cluster |
 | N-INF-10 gate-disabled | Gate is always on in GA | Needs pre-4.18 cluster |
-| VPD available | CO removed in 5.0 | Needs 4.x cluster |
 | VPD #224 | Hardcoded skip (upstream PR) | Wait for merge |
 
 ## Expected Failures

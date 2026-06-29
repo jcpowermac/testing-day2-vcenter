@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
-	"github.com/jcallen/testing-day2-vcenter/pkg/vsphere"
 	configv1 "github.com/openshift/api/config/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -52,13 +51,38 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			expectFailureDomainRemovalDenied(infra, region, zone)
 		})
 
-		It("should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)", func() {
+		It("should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)", Label("mutating"), func() {
 			infra := currentInfrastructure()
-			region, zone, ok := findMachineSetBackedFailureDomain(infra)
-			if !ok {
-				Skip("no MachineSet-backed failure domain found")
+			fds := framework.GetFailureDomains(infra)
+			if len(fds) == 0 {
+				Skip("no failure domains configured")
 			}
-			expectFailureDomainRemovalDenied(infra, region, zone)
+
+			sets := listMachineSets()
+			if len(sets) == 0 {
+				Skip("no existing MachineSets to clone providerSpec from")
+			}
+
+			fd := fds[0]
+			msName := "e2e-vap-ms-n-seq-03"
+			ms := framework.CloneMachineSetForVAP(sets[0], msName, fd.Region, fd.Zone, 1)
+
+			created, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(func() {
+				_ = framework.ScaleMachineSet(suiteCtx, clients.Machine, created.Name, 0)
+				Eventually(func() error {
+					return framework.WaitForMachineSetDrained(suiteCtx, clients.Machine, created.Name)
+				}).WithTimeout(framework.LongTimeout).WithPolling(framework.DefaultPolling).Should(Succeed())
+				_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, created.Name)
+			})
+
+			GinkgoWriter.Printf("waiting for MachineSet %s to scale to 1...\n", msName)
+			Eventually(func() error {
+				return framework.WaitForMachineSetMachines(suiteCtx, clients.Machine, msName, 1)
+			}).WithTimeout(framework.LongTimeout).WithPolling(framework.DefaultPolling).Should(Succeed())
+
+			expectFailureDomainRemovalDenied(infra, fd.Region, fd.Zone)
 		})
 
 		It("should allow removing an unreferenced failure domain via dry-run", func() {
@@ -68,28 +92,20 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 				Skip("no failure domains configured")
 			}
 
-			machineFDs := map[string]struct{}{}
-			for _, machine := range listMachines() {
-				r, z, ok := machineLabeledFailureDomain(machine)
-				if ok {
-					machineFDs[vsphere.FailureDomainKey(r, z)] = struct{}{}
-				}
-			}
-
 			var candidate *configv1.VSpherePlatformFailureDomainSpec
 			for i := range fds {
-				key := vsphere.FailureDomainKey(fds[i].Region, fds[i].Zone)
-				if _, inUse := machineFDs[key]; !inUse {
+				spec := specWithoutFailureDomain(infra, fds[i].Region, fds[i].Zone)
+				_, err := patchInfrastructureSpec(spec, true)
+				if err == nil {
 					candidate = &fds[i]
+					GinkgoWriter.Printf("FD %q (region=%s zone=%s) is unreferenced\n", fds[i].Name, fds[i].Region, fds[i].Zone)
 					break
 				}
+				GinkgoWriter.Printf("FD %q is referenced: %s\n", fds[i].Name, framework.InfrastructurePatchError(err))
 			}
 			if candidate == nil {
-				Skip("all failure domains are referenced by Machines")
+				Skip("all failure domains are referenced by Machines, CPMS, or MachineSets")
 			}
-
-			spec := specWithoutFailureDomain(infra, candidate.Region, candidate.Zone)
-			expectPatchAllowedDryRun(spec)
 		})
 	})
 

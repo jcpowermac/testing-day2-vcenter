@@ -38,7 +38,7 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 	})
 
 	Context("active MachineSet VAP test", Label("p1"), func() {
-		It("should deny removing an FD referenced by a 0-replica MachineSet", func() {
+		It("should deny removing an FD referenced by a scaled MachineSet", func() {
 			requireGateEnabled()
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)
@@ -52,13 +52,23 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 			}
 
 			fd := fds[0]
-			ms := framework.CloneMachineSetForVAP(sets[0], "e2e-vap-probe-ms", fd.Region, fd.Zone)
+			msName := "e2e-vap-probe-ms"
+			ms := framework.CloneMachineSetForVAP(sets[0], msName, fd.Region, fd.Zone, 1)
 
 			created, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
+				_ = framework.ScaleMachineSet(suiteCtx, clients.Machine, created.Name, 0)
+				Eventually(func() error {
+					return framework.WaitForMachineSetDrained(suiteCtx, clients.Machine, created.Name)
+				}).WithTimeout(framework.LongTimeout).WithPolling(framework.DefaultPolling).Should(Succeed())
 				_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, created.Name)
 			})
+
+			GinkgoWriter.Printf("waiting for MachineSet %s to scale to 1 replica...\n", msName)
+			Eventually(func() error {
+				return framework.WaitForMachineSetMachines(suiteCtx, clients.Machine, msName, 1)
+			}).WithTimeout(framework.LongTimeout).WithPolling(framework.DefaultPolling).Should(Succeed())
 
 			expectFailureDomainRemovalDenied(infra, fd.Region, fd.Zone)
 		})

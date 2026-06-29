@@ -51,11 +51,10 @@ func CPMSVSphereFailureDomainNames(cpms *machinev1.ControlPlaneMachineSet) []str
 	return names
 }
 
-// CloneMachineSetForVAP clones an existing MachineSet with 0 replicas and
-// overridden region/zone labels, preserving the providerSpec so the MAO
-// admission webhook accepts the create.
-func CloneMachineSetForVAP(source machinev1beta1.MachineSet, name, region, zone string) *machinev1beta1.MachineSet {
-	replicas := int32(0)
+// CloneMachineSetForVAP clones an existing MachineSet with the given replica
+// count and overridden region/zone labels, preserving the providerSpec so the
+// MAO admission webhook accepts the create.
+func CloneMachineSetForVAP(source machinev1beta1.MachineSet, name, region, zone string, replicas int32) *machinev1beta1.MachineSet {
 	ms := &machinev1beta1.MachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -87,6 +86,52 @@ func CloneMachineSetForVAP(source machinev1beta1.MachineSet, name, region, zone 
 		},
 	}
 	return ms
+}
+
+// ScaleMachineSet sets the replica count on a MachineSet.
+func ScaleMachineSet(ctx context.Context, client machineclient.Interface, name string, replicas int32) error {
+	ms, err := client.MachineV1beta1().MachineSets(MachineAPINamespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get machineset %s: %w", name, err)
+	}
+	ms.Spec.Replicas = &replicas
+	_, err = client.MachineV1beta1().MachineSets(MachineAPINamespace).Update(ctx, ms, metav1.UpdateOptions{})
+	return err
+}
+
+// WaitForMachineSetMachines waits until the MachineSet has at least `count`
+// Machines in Running or Provisioned phase.
+func WaitForMachineSetMachines(ctx context.Context, client machineclient.Interface, msName string, count int) error {
+	machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+	})
+	if err != nil {
+		return fmt.Errorf("list machines for machineset %s: %w", msName, err)
+	}
+	ready := 0
+	for _, m := range machines.Items {
+		if m.Status.Phase != nil && (*m.Status.Phase == "Running" || *m.Status.Phase == "Provisioned") {
+			ready++
+		}
+	}
+	if ready < count {
+		return fmt.Errorf("machineset %s has %d/%d ready machines", msName, ready, count)
+	}
+	return nil
+}
+
+// WaitForMachineSetDrained waits until a MachineSet has no Machines.
+func WaitForMachineSetDrained(ctx context.Context, client machineclient.Interface, msName string) error {
+	machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+	})
+	if err != nil {
+		return fmt.Errorf("list machines for machineset %s: %w", msName, err)
+	}
+	if len(machines.Items) > 0 {
+		return fmt.Errorf("machineset %s still has %d machines", msName, len(machines.Items))
+	}
+	return nil
 }
 
 // CreateMachineSet creates a MachineSet in the machine API namespace.

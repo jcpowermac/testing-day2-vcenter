@@ -2,116 +2,132 @@
 
 ## Feature Gate (`featuregate_test.go`) [readonly, p0, operator]
 
-- **should expose VSphereMultiVCenterDay2 on FeatureGate/cluster** — Confirms the VSphereMultiVCenterDay2 gate appears in FeatureGate/cluster status with a version string.
-- **should report gate enabled state consistently** — Cross-checks that `IsFeatureGateEnabled` returns the same result the BeforeSuite cached.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should expose VSphereMultiVCenterDay2 on FeatureGate/cluster | Confirms the gate appears in FeatureGate/cluster status with a version string | openshift/api | |
+| should report gate enabled state consistently | Cross-checks `IsFeatureGateEnabled` returns the same result the BeforeSuite cached | openshift/api | |
 
 ## Infrastructure xValidation (`infrastructure_validation_test.go`) [readonly, validation, p0]
 
-### Gate enabled
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should allow adding a second vCenter via dry-run | Dry-run patches a second vCenter and expects acceptance | openshift/api | |
+| should reject duplicate vCenter server values (N-INF-01/02) | Two vCenters with same server rejected by CRD uniqueness rule | openshift/api | |
+| should reject reducing vcenters to an empty array (N-INF-03) | `vcenters:[]` rejected by minItems=1 rule | openshift/api | |
+| should reject removing the vcenters field once set (N-INF-04) | `vcenters:null` rejected | openshift/api | |
+| should reject swapping an existing vCenter server (N-INF-05) | Changing vCenter server address triggers "Cannot add and remove at the same time" | openshift/api | |
+| should reject simultaneous add and remove of vCenters (N-INF-06/07) | Replacing one vCenter with another in same patch triggers add-and-remove guard | openshift/api | |
+| should reject more than 3 vCenters (N-INF-11) | Exceeding 3 vCenters rejected by maxItems=3 rule | openshift/api | |
+| should reject removing a vCenter still referenced by a failure domain (N-INF-12) | Removes vCenter while FD still references it. **Expected failure** — no xValidation rule enforces this | openshift/api | SPLAT-2827 |
+| should allow patching unrelated Infrastructure fields via dry-run (ratcheting) | Identity-patches current spec to confirm ratcheting allows no-op updates | openshift/api | |
+| should reject adding a second vCenter (N-INF-09) | Gate-off: adding a vCenter triggers immutability rule | openshift/api | |
+| should reject removing the only vCenter (N-INF-10) | Gate-off: emptying vcenters list triggers immutability rule | openshift/api | |
 
-- **should allow adding a second vCenter via dry-run** — Dry-run patches a second vCenter into the Infrastructure spec and expects acceptance.
-- **should reject duplicate vCenter server values (N-INF-01/02)** — Submits a spec with two vCenters sharing the same server and expects the CRD uniqueness rule to reject it.
-- **should reject reducing vcenters to an empty array (N-INF-03)** — Sends a raw JSON patch setting `vcenters:[]` and expects the minItems=1 rule to reject it.
-- **should reject removing the vcenters field once set (N-INF-04)** — Sends a raw JSON patch setting `vcenters:null` and expects rejection.
-- **should reject swapping an existing vCenter server (N-INF-05)** — Changes an existing vCenter's server address and expects the "Cannot add and remove at the same time" rule to fire.
-- **should reject simultaneous add and remove of vCenters (N-INF-06/07)** — Replaces one vCenter with a new one in the same patch, which triggers the add-and-remove guard.
-- **should reject more than 3 vCenters (N-INF-11)** — Adds vCenters until count exceeds 3 and expects the maxItems=3 rule to reject.
-- **should reject removing a vCenter still referenced by a failure domain (N-INF-12)** — Removes a vCenter while a failure domain still references its server. Currently fails intentionally because no xValidation rule enforces this (SPLAT-2827).
-- **should allow patching unrelated Infrastructure fields via dry-run (ratcheting)** — Identity-patches the current spec to confirm ratcheting allows no-op updates.
+## ValidatingAdmissionPolicies (`vap_test.go`) [readonly/mutating, admission, p0]
 
-### Gate disabled
-
-- **should reject adding a second vCenter (N-INF-09)** — With the gate off, adding a vCenter triggers the "vcenters cannot be added or removed once set" rule.
-- **should reject removing the only vCenter (N-INF-10)** — With the gate off, emptying the vcenters list triggers the same immutability rule.
-
-## ValidatingAdmissionPolicies (`vap_test.go`) [readonly, admission, p0]
-
-### Gate enabled
-
-- **should install vSphere failure domain VAP resources** — Verifies all three VAPs (machine, cpms, machineset) and their bindings exist on the cluster.
-- **should deny removing a failure domain referenced by a Machine (N-SEQ-01)** — Removes a failure domain whose region/zone matches a Machine's labels and expects the VAP to deny.
-- **should deny removing a failure domain referenced by a CPMS (N-SEQ-02)** — Removes a failure domain whose name matches a CPMS failure domain reference and expects the VAP to deny.
-- **should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)** — Removes a failure domain whose region/zone matches a MachineSet's template labels and expects the VAP to deny.
-- **should allow removing an unreferenced failure domain via dry-run** — Finds a failure domain not referenced by any Machine and confirms removal is accepted.
-
-### Gate disabled
-
-- **should not require vSphere VAP resources** — Confirms the Machine VAP is absent when the gate is off.
-
-### Probe
-
-- **records whether dry-run triggers VAP denials** — Logs whether VAP enforcement works under dry-run on this cluster.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should install vSphere failure domain VAP resources | Verifies all 3 VAPs (machine, cpms, machineset) and their bindings exist | cluster-config-operator | |
+| should deny removing a failure domain referenced by a Machine (N-SEQ-01) | Removes FD matching Machine region/zone labels, expects VAP denial | cluster-config-operator | |
+| should deny removing a failure domain referenced by a CPMS (N-SEQ-02) | Removes FD matching CPMS FD name reference, expects VAP denial | cluster-config-operator | |
+| should deny removing a failure domain referenced by a MachineSet (N-SEQ-03) | Creates 1-replica MachineSet, waits for Machine, tests VAP denial, cleans up | cluster-config-operator | |
+| should allow removing an unreferenced failure domain via dry-run | Dry-run probes each FD to find one the API accepts for removal | cluster-config-operator | |
+| should not require vSphere VAP resources | Gate-off: confirms Machine VAP is absent | cluster-config-operator | |
+| records whether dry-run triggers VAP denials | Logs whether VAP enforcement works under dry-run | cluster-config-operator | |
 
 ## Cloud Config Content (`configmap_content_test.go`) [readonly, config, p0]
 
-- **should parse managed kube-cloud-config YAML (N-CFG-01/02/03)** — Reads `openshift-config-managed/kube-cloud-config` and confirms it parses as valid cloud config YAML.
-- **should parse CCM cloud-conf YAML** — Reads `openshift-cloud-controller-manager/cloud-conf` and confirms it parses as valid cloud config YAML.
-- **should include all Infrastructure vCenters in managed cloud config** — Cross-checks that every vCenter in the Infrastructure CR has a corresponding entry in the managed cloud config.
-- **should not contain stale vCenters in managed cloud config (N-CFG-06)** — Confirms no vCenter entries exist in the managed cloud config that aren't in the Infrastructure CR.
-- **should keep insecure-flag out of per-vCenter entries when possible** — Checks that `insecure-flag` is only set globally, not duplicated per-vCenter.
-- **should include source openshift-config cloud config when present (three-way parity)** — When the source ConfigMap in `openshift-config` exists, validates that managed cloud config semantically matches the Infrastructure CR.
-- **should expose node network settings when configured (installer #10614)** — If the cloud config has a `nodes` section, confirms `externalNetworkSubnetCidr` or `internalNetworkSubnetCidr` is populated.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should parse managed kube-cloud-config YAML (N-CFG-01/02/03) | Parses `openshift-config-managed/kube-cloud-config` as valid cloud config YAML | cluster-config-operator | |
+| should parse CCM cloud-conf YAML | Parses `openshift-cloud-controller-manager/cloud-conf` as valid cloud config YAML | cloud-controller-manager | |
+| should include all Infrastructure vCenters in managed cloud config | Every Infrastructure vCenter has a corresponding managed cloud config entry | cluster-config-operator | |
+| should not contain stale vCenters in managed cloud config (N-CFG-06) | No cloud config vCenter entries exist that aren't in Infrastructure CR | cluster-config-operator | |
+| should keep insecure-flag out of per-vCenter entries when possible | `insecure-flag` only set globally, not duplicated per-vCenter | cluster-config-operator | |
+| should include source openshift-config cloud config when present (three-way parity) | Managed cloud config semantically matches Infrastructure CR and source ConfigMap | cluster-config-operator | |
+| should expose node network settings when configured (installer #10614) | `nodes` section has `externalNetworkSubnetCidr` or `internalNetworkSubnetCidr` | openshift/installer | installer#10614 |
 
 ## ConfigMap Ownership (`configmap_ownership_test.go`) [readonly/mutating, config, operator, p0/p1]
 
-- **should expose kube-cloud-config in openshift-config-managed** — Confirms the managed ConfigMap exists with the `cloud.conf` data key.
-- **should keep managed ConfigMap stable over observation window** — Watches the managed ConfigMap for 60 seconds and confirms no unexpected updates (single-writer steady state).
-- **should expose cloud-conf for CCM consumption** — Confirms the CCM ConfigMap exists with the `cloud.conf` data key.
-- **should recreate kube-cloud-config if deleted when gate is enabled (N-OP-07)** — Deletes the managed ConfigMap and expects the config-operator to recreate it within the default timeout. Restores the original on cleanup.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should expose kube-cloud-config in openshift-config-managed | Managed ConfigMap exists with `cloud.conf` data key | cluster-config-operator | |
+| should keep managed ConfigMap stable over observation window | Watches managed ConfigMap 60s, confirms no unexpected updates | cluster-config-operator | |
+| should expose cloud-conf for CCM consumption | CCM ConfigMap exists with `cloud.conf` data key | cloud-controller-manager | |
+| should recreate kube-cloud-config if deleted when gate is enabled (N-OP-07) | Deletes managed ConfigMap, expects config-operator to recreate it | cluster-config-operator | |
 
 ## Credential Propagation (`credentials_test.go`) [readonly, integration, p0]
 
-- **should have credential secrets for all Infrastructure vCenters** — Iterates all 4 credential consumer secrets and confirms each has key entries prefixed with every Infrastructure vCenter server.
-- **should have {namespace}/{name} with entries for every vCenter** — Per-secret specs that verify each consumer secret individually, skipping if the secret doesn't exist on the cluster.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should have credential secrets for all Infrastructure vCenters | All 4 consumer secrets have key entries for every Infrastructure vCenter | cloud-credential-operator | |
+| should have {namespace}/{name} with entries for every vCenter | Per-secret check, skips if secret doesn't exist | cloud-credential-operator | |
 
 ## Machine Integration (`machine_integration_test.go`) [readonly, integration, p0]
 
-- **should have all worker Machines in a healthy phase** — Confirms every non-deleting Machine is in Running or Provisioned phase.
-- **should label every Machine with region and zone** — Checks that every Machine has non-empty `machine.openshift.io/region` and `machine.openshift.io/zone` labels.
-- **should map every Machine to a valid Infrastructure failure domain** — Cross-references Machine region/zone labels against Infrastructure failure domains.
-- **should have Machine providerSpec workspace matching Infrastructure topology** — Confirms each Machine's workspace datacenter matches its labeled failure domain's topology.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should have all worker Machines in a healthy phase | Every non-deleting Machine is Running or Provisioned | machine-api-operator | |
+| should label every Machine with region and zone | Every Machine has non-empty region/zone labels | cloud-controller-manager | |
+| should map every Machine to a valid Infrastructure failure domain | Machine region/zone labels match Infrastructure FDs | cloud-controller-manager | |
+| should have Machine providerSpec workspace matching Infrastructure topology | Machine workspace datacenter matches labeled FD topology | machine-api-operator | |
 
 ## CPMS Integration (`cpms_integration_test.go`) [readonly, integration, p0]
 
-- **should reference failure domain names that exist in Infrastructure** — Confirms every failure domain name referenced in the CPMS spec exists in the Infrastructure CR.
-- **should have CPMS failure domains covering all Infrastructure FDs** — Logs which Infrastructure FDs are not referenced by the CPMS (informational, may be worker-only).
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should reference failure domain names that exist in Infrastructure | Every CPMS FD name exists in Infrastructure CR | machine-api-operator | |
+| should have CPMS failure domains covering all Infrastructure FDs | Logs Infrastructure FDs not referenced by CPMS (informational) | machine-api-operator | |
 
 ## MachineSet Integration (`machineset_integration_test.go`) [readonly, integration, p0]
 
-- **should have providerSpec workspace matching an Infrastructure FD topology** — Confirms each MachineSet's workspace datacenter maps to a known Infrastructure failure domain.
-- **should have MachineSet template labels matching Infrastructure failure domains** — Checks that region/zone labels on MachineSet templates correspond to existing failure domains.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should have providerSpec workspace matching an Infrastructure FD topology | MachineSet workspace datacenter maps to known Infrastructure FD | machine-api-operator | |
+| should have MachineSet template labels matching Infrastructure failure domains | Region/zone labels on MachineSet templates correspond to existing FDs | machine-api-operator | |
 
 ## CSI Driver Integration (`csi_integration_test.go`) [readonly, integration, p1]
 
-- **should have CSI driver credential secret with entries for all vCenters** — Verifies `openshift-cluster-csi-drivers/vmware-vsphere-cloud-credentials` has key entries for every Infrastructure vCenter.
-- **should have CSI driver pods running** — Confirms CSI driver controller pods are in Running phase.
-- **should have managed cloud config listing all vCenter datacenters for CSI** — On multi-vCenter clusters, validates the managed cloud config includes all vCenters for CSI consumption.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should have CSI driver credential secret with entries for all vCenters | `openshift-cluster-csi-drivers/vmware-vsphere-cloud-credentials` has keys for every vCenter | vmware-vsphere-csi-driver-operator | |
+| should have CSI driver pods running | CSI driver controller pods are in Running phase | vmware-vsphere-csi-driver-operator | |
+| should have managed cloud config listing all vCenter datacenters for CSI | Multi-vCenter cloud config includes all vCenters for CSI | vmware-vsphere-csi-driver-operator | |
 
 ## Operator Health (`operator_health_test.go`) [readonly, operator, p0/p1]
 
-- **should keep ClusterOperator/{name} Available and not Degraded** — For each of `cloud-controller-manager`, `config-operator`, and `machine-api`, confirms Available=True and Degraded=False.
-- **should not have CCM pods in a crash loop** — Confirms CCM pods have fewer than 5 restarts.
-- **should not have MAO pods in a crash loop** — Confirms MAO pods have fewer than 5 restarts.
-- **should not have CSI driver pods in a crash loop** — Confirms vSphere CSI driver controller pods have fewer than 5 restarts.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should keep ClusterOperator/{name} Available and not Degraded | CCM, config-operator, machine-api are Available=True, Degraded=False | multiple | |
+| should not have CCM pods in a crash loop | CCM pods have fewer than 5 restarts | cloud-controller-manager | |
+| should not have MAO pods in a crash loop | MAO pods have fewer than 5 restarts | machine-api-operator | |
+| should not have CSI driver pods in a crash loop | CSI driver controller pods have fewer than 5 restarts | vmware-vsphere-csi-driver-operator | |
 
 ## vsphere-problem-detector (`problem_detector_test.go`) [readonly, operator, p1]
 
-- **should keep ClusterOperator/vsphere-problem-detector Available when installed** — If the vsphere-problem-detector ClusterOperator exists, confirms it is Available.
-- **should validate GetVCenter behavior after failure domain removal when #224 merges** — Placeholder for future testing of vsphere-problem-detector#224 (N-CFG-08). Currently skipped.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should have vsphere-problem-detector-operator deployment available | Deployment in `openshift-cluster-storage-operator` has >=1 available replica | vsphere-problem-detector | |
+| should not have vsphere-problem-detector pods in a crash loop | VPD pods have fewer than 5 restarts | vsphere-problem-detector | |
+| should validate GetVCenter behavior after failure domain removal when #224 merges | Placeholder for N-CFG-08. Currently skipped | vsphere-problem-detector | vsphere-problem-detector#224 |
 
 ## Topology Lifecycle (`topology_lifecycle_test.go`) [mutating, p0/p1]
 
-- **should deny removing a failure domain that still has Machines (N-SEQ-05 precheck)** — Dry-run removes a Machine-backed failure domain and expects the VAP to deny the update.
-- **should deny removing a vCenter referenced by a failure domain (N-SEQ-04)** — Removes a vCenter while its failure domain remains. Currently fails intentionally because no xValidation rule enforces this (SPLAT-2827).
-- **should deny removing an FD referenced by a 0-replica MachineSet** — Creates a 0-replica MachineSet with region/zone labels, then attempts to remove the corresponding FD. Expects the MachineSet VAP to deny. Cleans up the MachineSet on exit.
-- **should add and remove a temporary vCenter without leaving stale cloud config (#469)** — Adds a fake vCenter, waits for cloud config reconciliation, removes it, then confirms no stale entries remain. Restores Infrastructure on cleanup.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should deny removing a failure domain that still has Machines (N-SEQ-05 precheck) | Dry-run removes Machine-backed FD, expects VAP denial | cluster-config-operator | |
+| should deny removing a vCenter referenced by a failure domain (N-SEQ-04) | Removes vCenter while FD remains. **Expected failure** — no xValidation rule | openshift/api | SPLAT-2827 |
+| should deny removing an FD referenced by a scaled MachineSet | Creates 1-replica MachineSet, waits for Machine, tests VAP denial, cleans up | cluster-config-operator | |
+| should add and remove a temporary vCenter without leaving stale cloud config (#469) | Adds fake vCenter, waits for reconciliation, removes it, confirms no stale entries | cluster-config-operator | cluster-config-operator#469 |
 
 ## Real vCenter Day 2 (`real_vcenter_test.go`) [real-vcenter, p0, mutating]
 
-- **should include configured vCenter in Infrastructure** — Confirms the lab config's second vCenter server appears in the Infrastructure CR's vcenters list.
-- **should reflect configured vCenter in managed cloud config** — Parses managed cloud config and validates it includes all Infrastructure vCenters with no stale entries.
-- **should pass lab verification helper** — Runs the full `lab.Verify` workflow against the live cluster.
-- **should include failure domain when configured** — When lab config includes a failure domain, confirms it exists in the Infrastructure CR with the correct server reference.
-- **should have credential secrets updated with second vCenter entries** — After Day 2 add, confirms all 4 credential consumer secrets have entries for the second vCenter.
-- **should keep all operators healthy after Day 2 add** — Confirms cloud-controller-manager, config-operator, and machine-api are Available after the real vCenter was added.
-- **should have CCM cloud config reflecting second vCenter** — Parses the CCM cloud config and confirms the second vCenter server appears.
+| Test Name | Description | Component | PR/Issue |
+|---|---|---|---|
+| should include configured vCenter in Infrastructure | Lab config's second vCenter appears in Infrastructure vcenters list | openshift/api | |
+| should reflect configured vCenter in managed cloud config | Managed cloud config includes all Infrastructure vCenters, no stale entries | cluster-config-operator | |
+| should pass lab verification helper | Runs full `lab.Verify` workflow against live cluster | multiple | |
+| should include failure domain when configured | Lab FD exists in Infrastructure with correct server reference | openshift/api | |
+| should have credential secrets updated with second vCenter entries | All 4 consumer secrets have entries for second vCenter | cloud-credential-operator | |
+| should keep all operators healthy after Day 2 add | CCM, config-operator, machine-api are Available after real vCenter add | multiple | |
+| should have CCM cloud config reflecting second vCenter | CCM cloud config includes second vCenter server | cloud-controller-manager | |
