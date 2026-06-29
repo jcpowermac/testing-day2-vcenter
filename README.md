@@ -114,6 +114,7 @@ test/e2e/                 # Ginkgo suites
 ## Related docs
 
 - [Test catalog](./docs/tests.md) — one-line description of every test spec
+- [Running tests](./docs/running-tests.md) — cluster config requirements per test, skip/failure reference
 - [Coverage gap plan](./plans/coverage-gap-plan.md) — PR-to-test coverage matrix and implementation plan
 - [Risk assessment](./vsphere-multi-vcenter-day2-risk-assessment.md)
 - [Gap analysis](./vsphere-multi-vcenter-day2-gap-analysis.md)

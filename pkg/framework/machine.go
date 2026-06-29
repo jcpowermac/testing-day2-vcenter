@@ -51,13 +51,15 @@ func CPMSVSphereFailureDomainNames(cpms *machinev1.ControlPlaneMachineSet) []str
 	return names
 }
 
-// BuildMachineSet creates a 0-replica MachineSet spec with region/zone labels for VAP testing.
-func BuildMachineSet(name, namespace, region, zone string) *machinev1beta1.MachineSet {
+// CloneMachineSetForVAP clones an existing MachineSet with 0 replicas and
+// overridden region/zone labels, preserving the providerSpec so the MAO
+// admission webhook accepts the create.
+func CloneMachineSetForVAP(source machinev1beta1.MachineSet, name, region, zone string) *machinev1beta1.MachineSet {
 	replicas := int32(0)
-	return &machinev1beta1.MachineSet{
+	ms := &machinev1beta1.MachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: namespace,
+			Namespace: source.Namespace,
 			Labels: map[string]string{
 				MachineRegionLabel: region,
 				MachineZoneLabel:   zone,
@@ -78,9 +80,13 @@ func BuildMachineSet(name, namespace, region, zone string) *machinev1beta1.Machi
 						MachineZoneLabel:   zone,
 					},
 				},
+				Spec: machinev1beta1.MachineSpec{
+					ProviderSpec: source.Spec.Template.Spec.ProviderSpec,
+				},
 			},
 		},
 	}
+	return ms
 }
 
 // CreateMachineSet creates a MachineSet in the machine API namespace.

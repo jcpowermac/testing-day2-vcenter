@@ -46,9 +46,13 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 				Skip("no failure domains configured")
 			}
 
+			sets := listMachineSets()
+			if len(sets) == 0 {
+				Skip("no existing MachineSets to clone providerSpec from")
+			}
+
 			fd := fds[0]
-			msName := "e2e-vap-probe-ms"
-			ms := framework.BuildMachineSet(msName, framework.MachineAPINamespace, fd.Region, fd.Zone)
+			ms := framework.CloneMachineSetForVAP(sets[0], "e2e-vap-probe-ms", fd.Region, fd.Zone)
 
 			created, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
 			Expect(err).NotTo(HaveOccurred())

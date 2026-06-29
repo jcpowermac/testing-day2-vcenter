@@ -27,7 +27,7 @@ var _ = Describe("Operator health", Label("readonly", "operator", "p0"), func() 
 	}
 
 	It("should not have CCM pods in a crash loop", Label("p1"), func() {
-		pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube, framework.CCMConfigNamespace, "k8s-app=cloud-controller-manager")
+		pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube, framework.CCMConfigNamespace, "k8s-app=vsphere-cloud-controller-manager")
 		if err != nil || len(pods) == 0 {
 			Skip("CCM pods not found")
 		}
