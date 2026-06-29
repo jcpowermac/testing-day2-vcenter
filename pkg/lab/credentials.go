@@ -50,8 +50,10 @@ func mergeCloudProviderConfig(existing string, infra *configv1.Infrastructure, v
 		cfg.VCenter = map[string]vsphere.VCenterConfig{}
 	}
 
-	cfg.Global["user"] = vc.Username
-	cfg.Global["password"] = password
+	if !cloudConfigUsesSecretRef(cfg.Global) {
+		cfg.Global["user"] = vc.Username
+		cfg.Global["password"] = password
+	}
 	cfg.VCenter[vc.Server] = vsphere.VCenterConfig{
 		Server:      vc.Server,
 		Port:        vc.Port,
@@ -63,6 +65,33 @@ func mergeCloudProviderConfig(existing string, infra *configv1.Infrastructure, v
 		return "", fmt.Errorf("marshal cloud config: %w", err)
 	}
 	return string(out), nil
+}
+
+func mergeVSphereCredsSecret(data map[string][]byte, vc labconfig.VCenterConfig) (map[string][]byte, error) {
+	password, err := vc.PasswordValue()
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[string][]byte, len(data)+2)
+	for k, v := range data {
+		out[k] = append([]byte(nil), v...)
+	}
+	out[vc.Server+".username"] = []byte(vc.Username)
+	out[vc.Server+".password"] = []byte(password)
+	return out, nil
+}
+
+func cloudConfigUsesSecretRef(global map[string]interface{}) bool {
+	if global == nil {
+		return false
+	}
+	for _, key := range []string{"secretName", "secret-name", "secretNamespace", "secret-namespace"} {
+		if v, ok := global[key]; ok && fmt.Sprint(v) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeCloudCredentialsSecret(data map[string][]byte, vc labconfig.VCenterConfig) (map[string][]byte, error) {

@@ -60,8 +60,8 @@ failureDomain:   # optional but recommended
 1. Backs up to `.lab-state/`:
    - `Infrastructure/cluster`
    - `openshift-config/cloud-provider-config`
-   - `openshift-config/cloud-credentials`
-2. Merges credentials for the new vCenter into `cloud-credentials` and `cloud-provider-config`
+   - Credential secrets that exist on vSphere clusters (typically `kube-system/vsphere-creds`, optionally `openshift-machine-api/vsphere-cloud-credentials`)
+2. Merges credentials for the new vCenter into those secrets and `cloud-provider-config`
 3. Patches `Infrastructure/cluster` to append the vCenter (and optional failure domain)
 4. Waits for `cloud-controller-manager`, `cluster-config-operator`, and `machine-api` to recover
 

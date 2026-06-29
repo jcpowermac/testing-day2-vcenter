@@ -144,7 +144,7 @@ func usage() {
 
 Commands:
   apply    Add second vCenter from config/lab.yaml (backs up cluster first)
-  restore  Restore Infrastructure, cloud-provider-config, and cloud-credentials
+  restore  Restore Infrastructure, cloud-provider-config, and credential secrets
   verify   Check operators and managed cloud config include the vCenter
 
 Examples:

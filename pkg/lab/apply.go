@@ -190,11 +190,11 @@ func captureState(ctx context.Context, clients *framework.Clients, infra *config
 	}
 	state.ConfigMaps[objectKey(framework.SourceConfigNamespace, framework.SourceConfigName)] = *cm.DeepCopy()
 
-	secret, err := clients.Kube.CoreV1().Secrets(framework.SourceConfigNamespace).Get(ctx, "cloud-credentials", metav1.GetOptions{})
+	secrets, err := backupCredentialSecrets(ctx, clients.Kube)
 	if err != nil {
-		return nil, fmt.Errorf("get openshift-config/cloud-credentials: %w", err)
+		return nil, err
 	}
-	state.Secrets[objectKey(framework.SourceConfigNamespace, "cloud-credentials")] = *secret.DeepCopy()
+	state.Secrets = secrets
 	return state, nil
 }
 
@@ -208,17 +208,8 @@ func updateCredentials(ctx context.Context, clients *framework.Clients, infra *c
 		return err
 	}
 
-	secret, err := clients.Kube.CoreV1().Secrets(framework.SourceConfigNamespace).Get(ctx, "cloud-credentials", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	mergedSecret, err := mergeCloudCredentialsSecret(secret.Data, cfg.SecondVCenter)
-	if err != nil {
-		return err
-	}
-
 	if dryRun {
-		return nil
+		return updateCredentialSecrets(ctx, clients.Kube, cfg.SecondVCenter, true)
 	}
 
 	cmUpdate := cm.DeepCopy()
@@ -230,12 +221,7 @@ func updateCredentials(ctx context.Context, clients *framework.Clients, infra *c
 		return fmt.Errorf("update cloud-provider-config: %w", err)
 	}
 
-	secUpdate := secret.DeepCopy()
-	secUpdate.Data = mergedSecret
-	if _, err := clients.Kube.CoreV1().Secrets(secUpdate.Namespace).Update(ctx, secUpdate, metav1.UpdateOptions{}); err != nil {
-		return fmt.Errorf("update cloud-credentials: %w", err)
-	}
-	return nil
+	return updateCredentialSecrets(ctx, clients.Kube, cfg.SecondVCenter, false)
 }
 
 func buildInfrastructureSpec(infra *configv1.Infrastructure, cfg *labconfig.LabConfig) (*configv1.InfrastructureSpec, string, error) {
