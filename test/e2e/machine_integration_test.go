@@ -28,6 +28,7 @@ var _ = Describe("Machine integration", Label("readonly", "integration", "p0"), 
 	})
 
 	It("should label every Machine with region and zone", func() {
+		requireMultiVCenter()
 		machines := listMachines()
 		for _, m := range machines {
 			if m.DeletionTimestamp != nil {
@@ -41,6 +42,7 @@ var _ = Describe("Machine integration", Label("readonly", "integration", "p0"), 
 	})
 
 	It("should map every Machine to a valid Infrastructure failure domain", func() {
+		requireMultiVCenter()
 		infra := currentInfrastructure()
 		fds := framework.GetFailureDomains(infra)
 		if len(fds) == 0 {
@@ -63,6 +65,7 @@ var _ = Describe("Machine integration", Label("readonly", "integration", "p0"), 
 	})
 
 	It("should have Machine providerSpec workspace matching Infrastructure topology", func() {
+		requireMultiVCenter()
 		infra := currentInfrastructure()
 		fds := framework.GetFailureDomains(infra)
 		if len(fds) == 0 {

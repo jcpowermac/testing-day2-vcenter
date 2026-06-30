@@ -29,6 +29,21 @@ const (
 	MachineRegionLabel = "machine.openshift.io/region"
 	MachineZoneLabel   = "machine.openshift.io/zone"
 
+	CSIDriverNamespace       = "openshift-cluster-csi-drivers"
+	CSIDriverControllerLabel = "app=vmware-vsphere-csi-driver-controller"
+	CSIDriverNodeLabel       = "app=vmware-vsphere-csi-driver-node"
+	CSICredentialSecretName  = "vmware-vsphere-cloud-credentials"
+	CSITopologyKeyPrefix = "topology.csi.vmware.com/"
+	ClusterCSIDriverName     = "csi.vsphere.vmware.com"
+	StorageOperatorName      = "storage"
+
+	MCONamespace        = "openshift-machine-config-operator"
+	CoreOSBootImagesCM  = "coreos-bootimages"
+
+	TestPVCSize         = "1Gi"
+	TestNamespacePrefix = "e2e-csi-storage"
+	BusyboxImage        = "registry.k8s.io/e2e-test-images/busybox:1.36.1"
+
 	DefaultTimeout = 5 * time.Minute
 	DefaultPolling = 10 * time.Second
 	ShortTimeout   = 30 * time.Second

@@ -48,6 +48,7 @@ type TopologyConfig struct {
 	Datastore      string   `yaml:"datastore"`
 	Networks       []string `yaml:"networks"`
 	ResourcePool   string   `yaml:"resourcePool"`
+	Template       string   `yaml:"template,omitempty"`
 }
 
 // Load reads and validates lab config from path.

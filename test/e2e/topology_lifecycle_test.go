@@ -12,6 +12,7 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 	Context("negative dry-run prechecks", func() {
 		It("should deny removing a failure domain that still has Machines (N-SEQ-05 precheck)", func() {
 			requireGateEnabled()
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			region, zone, ok := findMachineBackedFailureDomain(infra)
 			if !ok {
@@ -22,6 +23,7 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 
 		It("should deny removing a vCenter referenced by a failure domain (N-SEQ-04)", func() {
 			requireGateEnabled()
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			spec := fdReferencingRemovedVCenterSpec(infra)
 			_, err := patchInfrastructureSpec(spec, true)
@@ -40,6 +42,7 @@ var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
 	Context("active MachineSet VAP test", Label("p1"), func() {
 		It("should deny removing an FD referenced by a scaled MachineSet", func() {
 			requireGateEnabled()
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)
 			if len(fds) == 0 {

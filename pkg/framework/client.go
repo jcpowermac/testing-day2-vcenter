@@ -32,6 +32,8 @@ func NewClients() (*Clients, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg.QPS = 50
+	cfg.Burst = 100
 
 	kube, err := kubernetes.NewForConfig(cfg)
 	if err != nil {

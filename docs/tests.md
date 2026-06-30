@@ -1,5 +1,9 @@
 # Test Catalog
 
+> **Note:** Tests guarded with `requireMultiVCenter()` skip on single-vCenter clusters.
+> Run `make apply-lab` to add the second vCenter before expecting full coverage.
+> Tests labeled `real-vcenter` additionally require `E2E_LAB_CONFIG` to be set.
+
 ## Feature Gate (`featuregate_test.go`) [readonly, p0, operator]
 
 | Test ID | Description | Component | PR/Issue |
@@ -28,12 +32,11 @@
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
 | N-SEQ-00 | All 3 VAPs (machine, cpms, machineset) and bindings exist on cluster | cluster-config-operator | MAO#1510 |
-| N-SEQ-01 | Removing FD matching Machine region/zone labels denied by VAP | cluster-config-operator | MAO#1510 |
-| N-SEQ-02 | Removing FD matching CPMS FD name reference denied by VAP | cluster-config-operator | MAO#1510 |
+| N-SEQ-01 | Removing FD matching Machine region/zone labels denied by VAP (real patch, `mutating`) | cluster-config-operator | MAO#1510 |
+| N-SEQ-02 | Removing FD matching CPMS FD name reference denied by VAP (real patch, `mutating`) | cluster-config-operator | MAO#1510 |
 | N-SEQ-03 | Create 1-replica MachineSet, wait for Machine, removing its FD denied by VAP | cluster-config-operator | MAO#1510 |
 | N-SEQ-06 | Dry-run probes each FD to find one the API accepts for removal | cluster-config-operator | MAO#1510 |
 | N-SEQ-07 | Gate-off: Machine VAP is absent | cluster-config-operator | MAO#1510 |
-| N-SEQ-PROBE | Logs whether VAP enforcement works under dry-run on this cluster | cluster-config-operator | MAO#1510 |
 
 ## Cloud Config Content (`configmap_content_test.go`) [readonly, config, p0]
 

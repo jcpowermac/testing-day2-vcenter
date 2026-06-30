@@ -2,9 +2,8 @@ package e2e
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
+	"runtime"
 	"testing"
 
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
@@ -15,6 +14,7 @@ import (
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,9 +23,9 @@ var (
 	clients     *framework.Clients
 	infraBackup *configv1.Infrastructure
 	gateEnabled bool
-	vapDryRunWorks bool
 	labCfg      *labconfig.LabConfig
-	labCfgPath  string
+	labCfgPath     string
+	csiTopoKeys    *framework.CSITopologyKeys
 )
 
 func TestE2E(t *testing.T) {
@@ -57,8 +57,14 @@ var _ = BeforeSuite(func() {
 		}
 	}
 
-	vapDryRunWorks = probeVAPDryRun()
-	GinkgoWriter.Printf("VSphereMultiVCenterDay2 enabled=%v vapDryRunWorks=%v\n", gateEnabled, vapDryRunWorks)
+	GinkgoWriter.Printf("VSphereMultiVCenterDay2 enabled=%v vCenters=%d\n", gateEnabled, len(framework.GetVCenters(infra)))
+
+	if keys, err := framework.DiscoverCSITopologyKeys(suiteCtx, clients.Kube); err == nil {
+		csiTopoKeys = keys
+		GinkgoWriter.Printf("CSI topology keys: region=%s zone=%s\n", keys.Region, keys.Zone)
+	} else {
+		GinkgoWriter.Printf("CSI topology keys not discovered: %v\n", err)
+	}
 
 	if cfg, path, err := labconfig.LoadFromEnv(); err == nil {
 		labCfg = cfg
@@ -83,6 +89,13 @@ func requireGateEnabled() {
 func requireGateDisabled() {
 	if gateEnabled {
 		Skip("VSphereMultiVCenterDay2 feature gate is enabled; gate-off coverage delegated to openshift/api fixtures")
+	}
+}
+
+func requireMultiVCenter() {
+	infra := currentInfrastructure()
+	if len(framework.GetVCenters(infra)) < 2 {
+		Skip("cluster has fewer than 2 vCenters — run make apply-lab first")
 	}
 }
 
@@ -138,9 +151,6 @@ func expectPatchAllowedDryRun(spec *configv1.InfrastructureSpec) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func isVAPDenial(err error) bool {
-	return strings.Contains(framework.InfrastructurePatchError(err), "ValidatingAdmissionPolicy")
-}
 
 func withInfrastructureRestore(fn func(spec *configv1.InfrastructureSpec)) {
 	backup, err := framework.BackupInfrastructure(suiteCtx, clients.Config)
@@ -214,38 +224,12 @@ func specWithoutVCenter(infra *configv1.Infrastructure, server string) *configv1
 	return &spec
 }
 
-func probeVAPDryRun() bool {
-	infra := currentInfrastructure()
-	if infra.Spec.PlatformSpec.VSphere == nil {
-		return false
-	}
-	region, zone, ok := findMachineBackedFailureDomain(infra)
-	if !ok {
-		return false
-	}
-
-	spec := specWithoutFailureDomain(infra, region, zone)
-	_, err := patchInfrastructureSpec(spec, true)
-	return err != nil
-}
 
 func expectFailureDomainRemovalDenied(infra *configv1.Infrastructure, region, zone string) {
 	spec := specWithoutFailureDomain(infra, region, zone)
-
-	tryDryRun := vapDryRunWorks
-	if tryDryRun {
-		_, err := patchInfrastructureSpec(spec, true)
-		if err != nil {
-			Expect(framework.InfrastructurePatchError(err)).To(SatisfyAny(
-				ContainSubstring("failure domain"),
-				ContainSubstring("still in use"),
-			))
-			return
-		}
-	}
-
 	_, err := patchInfrastructureSpec(spec, false)
-	Expect(err).To(HaveOccurred())
+	Expect(err).To(HaveOccurred(),
+		"removing FD region=%s zone=%s should be denied by VAP", region, zone)
 	Expect(framework.InfrastructurePatchError(err)).To(SatisfyAny(
 		ContainSubstring("failure domain"),
 		ContainSubstring("still in use"),
@@ -268,23 +252,6 @@ func findCPMSBackedFailureDomain(infra *configv1.Infrastructure) (region, zone s
 	return "", "", false
 }
 
-func findMachineSetBackedFailureDomain(infra *configv1.Infrastructure) (region, zone string, found bool) {
-	fds := framework.GetFailureDomains(infra)
-	for _, ms := range listMachineSets() {
-		if ms.Spec.Template.Labels == nil {
-			continue
-		}
-		r := ms.Spec.Template.Labels[framework.MachineRegionLabel]
-		z := ms.Spec.Template.Labels[framework.MachineZoneLabel]
-		if r == "" || z == "" {
-			continue
-		}
-		if vsphere.FindFailureDomainByRegionZone(fds, r, z) != nil {
-			return r, z, true
-		}
-	}
-	return "", "", false
-}
 
 func managedCloudConfigYAML() string {
 	cm, err := framework.GetConfigMap(suiteCtx, clients.Kube, framework.ManagedConfigNamespace, framework.ManagedConfigName)
@@ -310,12 +277,6 @@ func sourceCloudConfigYAML() (string, bool) {
 	return cm.Data[framework.SourceCloudConfigDataKey], true
 }
 
-func marshalPatchFromSpec(spec *configv1.InfrastructureSpec) []byte {
-	payload := map[string]interface{}{"spec": spec}
-	data, err := json.Marshal(payload)
-	Expect(err).NotTo(HaveOccurred())
-	return data
-}
 
 func duplicateFirstVCenterSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
 	spec := vsphere.CloneInfrastructureSpec(infra.Spec)
@@ -357,12 +318,6 @@ func emptyVCentersSpec(infra *configv1.Infrastructure) *configv1.InfrastructureS
 	return &spec
 }
 
-func removeVCentersFieldSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
-	spec := vsphere.CloneInfrastructureSpec(infra.Spec)
-	Expect(spec.PlatformSpec.VSphere).NotTo(BeNil())
-	spec.PlatformSpec.VSphere.VCenters = nil
-	return &spec
-}
 
 func addSecondVCenterSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
 	spec := vsphere.CloneInfrastructureSpec(infra.Spec)
@@ -387,6 +342,110 @@ func tooManyVCentersSpec(infra *configv1.Infrastructure) *configv1.Infrastructur
 	}
 	return &spec
 }
+
+func requireLabConfigWithFD() *labconfig.LabConfig {
+	cfg := requireLabConfig()
+	if cfg.FailureDomain == nil {
+		Skip("lab config has no failureDomain — required for CSI storage tests")
+	}
+	return cfg
+}
+
+func createTestNamespaceWithCleanup(prefix string) string {
+	ns, err := framework.CreateTestNamespace(suiteCtx, clients.Kube, prefix)
+	Expect(err).NotTo(HaveOccurred())
+	DeferCleanup(func() {
+		_ = framework.DeleteNamespace(suiteCtx, clients.Kube, ns, framework.DefaultTimeout)
+	})
+	return ns
+}
+
+func requireCSITopologyKeys() *framework.CSITopologyKeys {
+	if csiTopoKeys == nil {
+		Skip("CSI topology keys not available — vCenter tag categories may not be configured")
+	}
+	return csiTopoKeys
+}
+
+func requireDefaultStorageClass() *storagev1.StorageClass {
+	sc, err := framework.GetDefaultStorageClass(suiteCtx, clients.Kube)
+	if err != nil {
+		Skip(fmt.Sprintf("no default StorageClass: %v", err))
+	}
+	return sc
+}
+
+func ensureTemplateInSecondVC(lab *labconfig.LabConfig, infraID string) string {
+	fd := lab.FailureDomain
+	topo := fd.Topology
+
+	templateName := topo.Template
+	if templateName == "" {
+		templateName = vsphere.TemplateNameForFailureDomain(infraID, fd.Name)
+	}
+	Expect(vsphere.ValidateTemplateName(templateName)).To(Succeed())
+
+	password, err := lab.SecondVCenter.PasswordValue()
+	Expect(err).NotTo(HaveOccurred(), "get second vCenter password")
+
+	session, err := vsphere.NewSession(suiteCtx, vsphere.Params{
+		Server:     lab.SecondVCenter.Server,
+		Datacenter: topo.Datacenter,
+		Username:   lab.SecondVCenter.Username,
+		Password:   password,
+		Insecure:   true,
+	})
+	Expect(err).NotTo(HaveOccurred(), "connect to second vCenter %s", lab.SecondVCenter.Server)
+	defer session.Close(suiteCtx)
+
+	Expect(vsphere.EnsureVMFolder(suiteCtx, session, infraID)).To(Succeed(),
+		"ensure VM folder %s exists in %s", infraID, topo.Datacenter)
+
+	path, found, err := vsphere.FindTemplateByName(suiteCtx, session, templateName)
+	if found && err == nil {
+		GinkgoWriter.Printf("template %s already exists at %s, skipping import\n", templateName, path)
+		return templateName
+	}
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred(), "check template %s", templateName)
+	}
+
+	GinkgoWriter.Printf("template %s not found in %s, importing RHCOS OVA\n", templateName, topo.Datacenter)
+
+	cm, err := clients.Kube.CoreV1().ConfigMaps(framework.MCONamespace).Get(
+		suiteCtx, framework.CoreOSBootImagesCM, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred(), "get %s/%s ConfigMap", framework.MCONamespace, framework.CoreOSBootImagesCM)
+
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
+	}
+	ova, err := vsphere.ResolveRHCOSOVAFromConfigMap(cm, arch)
+	Expect(err).NotTo(HaveOccurred(), "resolve RHCOS OVA for arch %s", arch)
+	GinkgoWriter.Printf("resolved RHCOS OVA: %s (sha256=%s)\n", ova.Location, ova.Sha256)
+
+	ovaPath, err := vsphere.DownloadOVAToDir(suiteCtx, ova.Location, ova.Sha256, "/tmp/ova-cache")
+	Expect(err).NotTo(HaveOccurred(), "download RHCOS OVA")
+	GinkgoWriter.Printf("OVA downloaded to %s\n", ovaPath)
+
+	network := topo.Networks[0]
+	vmFolder := fmt.Sprintf("/%s/vm/%s", topo.Datacenter, infraID)
+	_, err = vsphere.ImportOVA(suiteCtx, vsphere.ImportOVAParams{
+		Session:        session,
+		OVAPath:        ovaPath,
+		TemplateName:   templateName,
+		ComputeCluster: topo.ComputeCluster,
+		Datastore:      topo.Datastore,
+		Network:        network,
+		Folder:         vmFolder,
+		ResourcePool:   topo.ResourcePool,
+	})
+	Expect(err).NotTo(HaveOccurred(), "import OVA as template %s", templateName)
+	GinkgoWriter.Printf("template %s imported successfully\n", templateName)
+
+	return templateName
+}
+
 
 func fdReferencingRemovedVCenterSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
 	spec := vsphere.CloneInfrastructureSpec(infra.Spec)

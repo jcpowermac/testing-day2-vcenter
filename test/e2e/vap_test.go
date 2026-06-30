@@ -5,7 +5,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,7 +32,8 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			}
 		})
 
-		It("should deny removing a failure domain referenced by a Machine (N-SEQ-01)", func() {
+		It("should deny removing a failure domain referenced by a Machine (N-SEQ-01)", Label("mutating"), func() {
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			region, zone, ok := findMachineBackedFailureDomain(infra)
 			if !ok {
@@ -42,7 +42,8 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			expectFailureDomainRemovalDenied(infra, region, zone)
 		})
 
-		It("should deny removing a failure domain referenced by a CPMS (N-SEQ-02)", func() {
+		It("should deny removing a failure domain referenced by a CPMS (N-SEQ-02)", Label("mutating"), func() {
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			region, zone, ok := findCPMSBackedFailureDomain(infra)
 			if !ok {
@@ -52,6 +53,7 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 		})
 
 		It("should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)", Label("mutating"), func() {
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)
 			if len(fds) == 0 {
@@ -86,6 +88,7 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 		})
 
 		It("should allow removing an unreferenced failure domain via dry-run", func() {
+			requireMultiVCenter()
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)
 			if len(fds) == 0 {
@@ -120,15 +123,3 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 	})
 })
 
-var _ = Describe("VAP dry-run probe", Label("readonly", "admission"), func() {
-	It("records whether dry-run triggers VAP denials", func() {
-		GinkgoWriter.Printf("vapDryRunWorks=%v\n", vapDryRunWorks)
-		if !gateEnabled {
-			Skip("feature gate disabled")
-		}
-		if !vapDryRunWorks {
-			GinkgoWriter.Println("VAP denials will use real patch attempts that should be rejected without persisting state")
-		}
-		Expect(admissionregistrationv1.Deny).NotTo(BeEmpty())
-	})
-})

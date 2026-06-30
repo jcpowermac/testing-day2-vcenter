@@ -10,11 +10,16 @@ make vet                  # go vet
 make test-readonly        # run readonly e2e tests (safe, no cluster mutation)
 make test-p0              # run p0 readonly tests only
 make test-mutating        # run mutating tests (changes cluster state, restores after)
+make test-storage         # run storage provisioning tests (needs lab config)
+make test-storage-readonly # storage tests that don't provision PVCs
 make test-real            # run tests requiring a real second vCenter (needs config/lab.yaml)
+make test-e2e             # full end-to-end: baseline → apply → verify → all tests → restore
 make apply-lab            # add second vCenter to cluster using lab config
 make restore-lab          # revert cluster to pre-apply state
 make verify-lab           # verify second vCenter was added correctly
 ```
+
+`apply-lab` and `restore-lab` wait for full cluster readiness (operators stable + all Machines Running) before returning.
 
 All e2e tests require `KUBECONFIG` pointing at a vSphere-platform OpenShift cluster.
 
@@ -43,6 +48,7 @@ test/e2e/               Ginkgo e2e test suites
   configmap_ownership_test.go         ConfigMap ownership migration tests
   operator_health_test.go             ClusterOperator health checks
   topology_lifecycle_test.go          Mutating lifecycle tests
+  csi_storage_test.go                 CSI storage provisioning tests
   real_vcenter_test.go                Tests requiring real second vCenter
   problem_detector_test.go            vsphere-problem-detector tests (stub)
 config/lab.yaml.example Lab config template
@@ -59,8 +65,8 @@ plans/                  Test plan documents
 
 ## Test Labels
 
-- `readonly` — safe to run, no cluster mutation (uses server-side dry-run)
-- `mutating` — modifies cluster state (backup/restore around each test)
+- `readonly` — safe to run, no cluster mutation. xValidation tests use server-side dry-run. Multi-vCenter tests skip on single-vCenter clusters.
+- `mutating` — modifies cluster state (backup/restore around each test). VAP denial tests use real patches (denied = no mutation).
 - `p0`, `p1`, `p2` — priority tiers
 - `validation` — xValidation (CRD CEL rules) tests
 - `admission` — ValidatingAdmissionPolicy tests

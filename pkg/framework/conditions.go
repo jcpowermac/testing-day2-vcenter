@@ -60,6 +60,46 @@ func WaitForClusterOperatorAvailable(ctx context.Context, client configclient.In
 	return pollErr
 }
 
+// WaitForClusterOperatorStable waits until Available=True, Degraded=False, and
+// Progressing=False. This confirms the operator has finished rolling out.
+func WaitForClusterOperatorStable(ctx context.Context, client configclient.Interface, name string, timeout time.Duration) error {
+	var lastErr error
+	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		co, err := client.ConfigV1().ClusterOperators().Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			lastErr = fmt.Errorf("clusteroperator %q not found", name)
+			return false, nil
+		}
+		if err != nil {
+			lastErr = err
+			return false, nil
+		}
+
+		var availableOK, degradedOK, progressingOK bool
+		for i := range co.Status.Conditions {
+			switch co.Status.Conditions[i].Type {
+			case configv1.OperatorAvailable:
+				availableOK = co.Status.Conditions[i].Status == configv1.ConditionTrue
+			case configv1.OperatorDegraded:
+				degradedOK = co.Status.Conditions[i].Status == configv1.ConditionFalse
+			case configv1.OperatorProgressing:
+				progressingOK = co.Status.Conditions[i].Status == configv1.ConditionFalse
+			}
+		}
+		if !availableOK || !degradedOK || !progressingOK {
+			lastErr = fmt.Errorf("clusteroperator %q: Available=%v Degraded=%v Progressing=%v",
+				name, availableOK, !degradedOK, !progressingOK)
+			return false, nil
+		}
+		lastErr = nil
+		return true, nil
+	})
+	if pollErr != nil && lastErr != nil {
+		return fmt.Errorf("%w: last error: %v", pollErr, lastErr)
+	}
+	return pollErr
+}
+
 // CheckOperatorsNotDegraded verifies Degraded=False for each operator name.
 func CheckOperatorsNotDegraded(ctx context.Context, client configclient.Interface, operators []string) error {
 	for _, name := range operators {

@@ -3,7 +3,6 @@ package lab
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
 	"github.com/jcallen/testing-day2-vcenter/pkg/labconfig"
@@ -86,7 +85,7 @@ func Apply(ctx context.Context, clients *framework.Clients, cfg *labconfig.LabCo
 		if err != nil {
 			return nil, fmt.Errorf("apply infrastructure patch: %w", err)
 		}
-		if err := waitForOperators(ctx, clients); err != nil {
+		if err := waitForClusterReady(ctx, clients); err != nil {
 			return nil, err
 		}
 	}
@@ -145,7 +144,7 @@ func Restore(ctx context.Context, clients *framework.Clients, stateDir string) e
 		}
 	}
 
-	return waitForOperators(ctx, clients)
+	return waitForClusterReady(ctx, clients)
 }
 
 // Verify checks operators and cloud config include the configured vCenter.
@@ -268,14 +267,15 @@ func vsphereHasServer(infra *configv1.Infrastructure, server string) bool {
 	return false
 }
 
-func waitForOperators(ctx context.Context, clients *framework.Clients) error {
+func waitForClusterReady(ctx context.Context, clients *framework.Clients) error {
 	for _, name := range []string{"cloud-controller-manager", "config-operator", "machine-api"} {
-		if err := framework.WaitForClusterOperatorAvailable(ctx, clients.Config, name, framework.DefaultTimeout); err != nil {
-			return fmt.Errorf("wait for clusteroperator %q: %w", name, err)
+		if err := framework.WaitForClusterOperatorStable(ctx, clients.Config, name, framework.LongTimeout); err != nil {
+			return fmt.Errorf("operator %q not stable: %w", name, err)
 		}
 	}
-	// Allow CCCMO to reconcile cloud config after Infrastructure change.
-	time.Sleep(15 * time.Second)
+	if err := framework.WaitForAllMachinesHealthy(ctx, clients.Machine, framework.LongTimeout); err != nil {
+		return fmt.Errorf("machines not ready: %w", err)
+	}
 	return nil
 }
 
