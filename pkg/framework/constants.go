@@ -42,7 +42,7 @@ const (
 
 	TestPVCSize         = "1Gi"
 	TestNamespacePrefix = "e2e-csi-storage"
-	BusyboxImage        = "registry.k8s.io/e2e-test-images/busybox:1.36.1"
+	BusyboxImage        = "registry.k8s.io/e2e-test-images/busybox:1.36.1-1"
 
 	DefaultTimeout = 5 * time.Minute
 	DefaultPolling = 10 * time.Second
