@@ -94,6 +94,22 @@
 | N-CSI-02 | CSI driver controller pods are Running | vmware-vsphere-csi-driver-operator | |
 | N-CSI-03 | Multi-vCenter cloud config includes all vCenters for CSI | vmware-vsphere-csi-driver-operator | CCMO#442 |
 
+## CSI Storage Provisioning (`csi_storage_test.go`) [readonly/mutating, storage, p0–p2]
+
+| Test ID | Description | Component | PR/Issue |
+|---|---|---|---|
+| N-CSI-01 | ClusterCSIDriver Available and not Degraded | vmware-vsphere-csi-driver-operator | |
+| N-CSI-10 | Default StorageClass backed by vSphere CSI with WaitForFirstConsumer | vmware-vsphere-csi-driver-operator | |
+| N-CSI-11 | StorageClass topology plumbing connected to Infrastructure FDs | vmware-vsphere-csi-driver-operator | |
+| N-CSI-02 | CSI driver pods healthy with current Infrastructure topology | vmware-vsphere-csi-driver-operator | |
+| N-CSI-03 | CSI credential secret reflecting all vCenters | vmware-vsphere-csi-driver-operator | |
+| N-CSI-04 | Provision and bind PVC in existing failure domain | vmware-vsphere-csi-driver-operator | |
+| N-CSI-07 | PV deleted when PVC deleted with reclaimPolicy Delete | vmware-vsphere-csi-driver-operator | |
+| N-CSI-05 | Provision PV in new failure domain with correct topology labels. **Expected failure** — storage policy not propagated to second vCenter | vmware-vsphere-csi-driver-operator | |
+| N-CSI-06 | Provision PVC with explicit topology constraint in correct FD. **Expected failure** — storage policy gap | vmware-vsphere-csi-driver-operator | |
+| N-CSI-08 | Probe FD removal behavior when PVs exist in that FD | vmware-vsphere-csi-driver-operator, openshift/api | api#2784, MAO#1510 |
+| N-CSI-09 | vCenter removal blocked by xValidation while PVs present (PV irrelevant) | vmware-vsphere-csi-driver-operator, openshift/api | api#2784 |
+
 ## Operator Health (`operator_health_test.go`) [readonly, operator, p0/p1]
 
 | Test ID | Description | Component | PR/Issue |
