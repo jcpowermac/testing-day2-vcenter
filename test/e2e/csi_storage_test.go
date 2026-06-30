@@ -152,11 +152,9 @@ var _ = Describe("CSI storage provisioning baseline", Label("real-vcenter", "mut
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-baseline-pvc", framework.TestPVCSize, sc.Name)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePVC(suiteCtx, clients.Kube, ns, pvc.Name) })
 
 		_, err = framework.CreateBusyboxPod(suiteCtx, clients.Kube, ns, "csi-baseline-pod", pvc.Name)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePod(suiteCtx, clients.Kube, ns, "csi-baseline-pod") })
 
 		boundPVC, err := framework.WaitForPVCBound(suiteCtx, clients.Kube, ns, pvc.Name, framework.LongTimeout)
 		Expect(err).NotTo(HaveOccurred(), "PVC should bind within timeout")
@@ -308,7 +306,6 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-newfd-pvc", framework.TestPVCSize, sc.Name)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePVC(suiteCtx, clients.Kube, ns, pvc.Name) })
 
 		nodeSelector := map[string]string{
 			topoKeys.Region: lab.FailureDomain.Region,
@@ -316,17 +313,12 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		}
 		_, err = framework.CreateBusyboxPodWithNodeSelector(suiteCtx, clients.Kube, ns, "csi-newfd-pod", pvc.Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePod(suiteCtx, clients.Kube, ns, "csi-newfd-pod") })
 
 		boundPVC, err := framework.WaitForPVCBound(suiteCtx, clients.Kube, ns, pvc.Name, framework.LongTimeout)
 		Expect(err).NotTo(HaveOccurred(), "PVC should bind in new failure domain within timeout")
 
 		pv, err := framework.GetPV(suiteCtx, clients.Kube, boundPVC.Spec.VolumeName)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			_ = framework.DeletePV(suiteCtx, clients.Kube, pv.Name)
-			_ = framework.WaitForPVDeleted(suiteCtx, clients.Kube, pv.Name, framework.LongTimeout)
-		})
 
 		pvRegion, pvZone, ok := framework.PVTopologyLabels(pv, topoKeys)
 		Expect(ok).To(BeTrue(), "PV should have CSI topology labels in nodeAffinity")
@@ -362,11 +354,9 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-topo-pvc", framework.TestPVCSize, scName)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePVC(suiteCtx, clients.Kube, ns, pvc.Name) })
 
 		_, err = framework.CreateBusyboxPod(suiteCtx, clients.Kube, ns, "csi-topo-pod", pvc.Name)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePod(suiteCtx, clients.Kube, ns, "csi-topo-pod") })
 
 		boundPVC, err := framework.WaitForPVCBound(suiteCtx, clients.Kube, ns, pvc.Name, framework.LongTimeout)
 		Expect(err).NotTo(HaveOccurred())
@@ -386,7 +376,6 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-guard-pvc", framework.TestPVCSize, sc.Name)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePVC(suiteCtx, clients.Kube, ns, pvc.Name) })
 
 		nodeSelector := map[string]string{
 			topoKeys.Region: lab.FailureDomain.Region,
@@ -394,17 +383,12 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		}
 		_, err = framework.CreateBusyboxPodWithNodeSelector(suiteCtx, clients.Kube, ns, "csi-guard-pod", pvc.Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePod(suiteCtx, clients.Kube, ns, "csi-guard-pod") })
 
 		boundPVC, err := framework.WaitForPVCBound(suiteCtx, clients.Kube, ns, pvc.Name, framework.LongTimeout)
 		Expect(err).NotTo(HaveOccurred(), "PVC must bind before probing FD removal")
 
 		pv, err := framework.GetPV(suiteCtx, clients.Kube, boundPVC.Spec.VolumeName)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			_ = framework.DeletePV(suiteCtx, clients.Kube, pv.Name)
-			_ = framework.WaitForPVDeleted(suiteCtx, clients.Kube, pv.Name, framework.LongTimeout)
-		})
 
 		GinkgoWriter.Printf("PV %s bound in FD region=%s zone=%s, probing FD removal via dry-run\n",
 			pv.Name, lab.FailureDomain.Region, lab.FailureDomain.Zone)
@@ -446,7 +430,6 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-vc-guard-pvc", framework.TestPVCSize, sc.Name)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePVC(suiteCtx, clients.Kube, ns, pvc.Name) })
 
 		nodeSelector := map[string]string{
 			topoKeys.Region: lab.FailureDomain.Region,
@@ -454,7 +437,6 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		}
 		_, err = framework.CreateBusyboxPodWithNodeSelector(suiteCtx, clients.Kube, ns, "csi-vc-guard-pod", pvc.Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() { _ = framework.DeletePod(suiteCtx, clients.Kube, ns, "csi-vc-guard-pod") })
 
 		_, err = framework.WaitForPVCBound(suiteCtx, clients.Kube, ns, pvc.Name, framework.LongTimeout)
 		Expect(err).NotTo(HaveOccurred(), "PVC must bind before probing vCenter removal")

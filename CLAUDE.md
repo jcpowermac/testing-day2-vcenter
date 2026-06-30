@@ -39,11 +39,11 @@ make test-mutating GINKGO_FLAGS="-v --skip='N-SEQ-01|N-SEQ-02'"  # skip specific
 ## Remote Testing
 
 The test cluster is accessed via SSH. The workflow is:
-1. Edit code locally
-2. `rsync -az --delete --exclude='.git' ./ jcallen@10.38.201.171:~/Development/testing-day2-vcenter/`
+1. Edit and commit locally, `git push`
+2. `ssh jcallen@10.38.201.171 'cd ~/Development/testing-day2-vcenter && git pull'`
 3. `ssh jcallen@10.38.201.171 'KUBECONFIG=$HOME/before-installer-testing/vsphere-ipi/auth/kubeconfig make -C ~/Development/testing-day2-vcenter test-readonly'`
 
-Always use `make -C <path> <target>` when running remotely.
+Always use `make -C <path> <target>` when running remotely. Never rsync — use git push/pull.
 
 ## Project Layout
 
