@@ -23,6 +23,19 @@ make verify-lab           # verify second vCenter was added correctly
 
 All e2e tests require `KUBECONFIG` pointing at a vSphere-platform OpenShift cluster.
 
+### Test Reports & Ginkgo Flags
+
+JUnit XML reports are written to `reports/` (gitignored). Each target writes a separate file (e.g. `readonly.xml`, `mutating.xml`). The `test-e2e` target writes per-phase reports (`phase1-readonly.xml`, `phase3-readonly.xml`, etc.).
+
+Override Ginkgo behavior via `GINKGO_FLAGS` (default: `-v`):
+
+```bash
+make test-readonly GINKGO_FLAGS="-vv"              # verbose + GinkgoWriter output for passing tests
+make test-mutating GINKGO_FLAGS="-v --fail-fast"    # stop on first failure
+make test-mutating GINKGO_FLAGS="-v --focus='N-TOPO-01'"   # run one test
+make test-mutating GINKGO_FLAGS="-v --skip='N-SEQ-01|N-SEQ-02'"  # skip specific tests
+```
+
 ## Remote Testing
 
 The test cluster is accessed via SSH. The workflow is:
