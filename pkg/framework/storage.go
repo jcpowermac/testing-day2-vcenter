@@ -58,6 +58,7 @@ func DiscoverCSITopologyKeys(ctx context.Context, client kubernetes.Interface) (
 }
 
 // CreateTestNamespace creates a namespace with a generated suffix for test isolation.
+// It waits for the SCC admission controller to annotate the namespace before returning.
 func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, prefix string) (string, error) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -70,6 +71,17 @@ func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, prefi
 	created, err := client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("create test namespace: %w", err)
+	}
+	err = wait.PollUntilContextTimeout(ctx, time.Second, ShortTimeout, true, func(ctx context.Context) (bool, error) {
+		got, err := client.CoreV1().Namespaces().Get(ctx, created.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		_, ok := got.Annotations["openshift.io/sa.scc.uid-range"]
+		return ok, nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("namespace %s not annotated with SCC uid-range: %w", created.Name, err)
 	}
 	return created.Name, nil
 }

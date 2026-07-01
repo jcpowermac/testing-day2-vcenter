@@ -138,6 +138,27 @@ func WaitForMachineSetDrained(ctx context.Context, client machineclient.Interfac
 	return nil
 }
 
+// WaitForMachineSetDrainedWithDelete polls until a MachineSet has no Machines.
+func WaitForMachineSetDrainedWithDelete(ctx context.Context, client machineclient.Interface, msName string, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		err := WaitForMachineSetDrained(ctx, client, msName)
+		return err == nil, nil
+	})
+}
+
+// ForceDeleteMachineSetMachines deletes all Machines belonging to a MachineSet.
+func ForceDeleteMachineSetMachines(ctx context.Context, client machineclient.Interface, msName string) {
+	machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+	})
+	if err != nil {
+		return
+	}
+	for _, m := range machines.Items {
+		_ = client.MachineV1beta1().Machines(MachineAPINamespace).Delete(ctx, m.Name, metav1.DeleteOptions{})
+	}
+}
+
 // WaitForAllMachinesHealthy polls until every non-deleting Machine is in
 // "Running" phase. Returns an error listing unhealthy Machines on timeout.
 func WaitForAllMachinesHealthy(ctx context.Context, client machineclient.Interface, timeout time.Duration) error {
@@ -168,6 +189,46 @@ func WaitForAllMachinesHealthy(ctx context.Context, client machineclient.Interfa
 		}
 		if len(unhealthy) > 0 {
 			lastErr = fmt.Errorf("%d machines not Running: %v", len(unhealthy), unhealthy)
+			return false, nil
+		}
+		lastErr = nil
+		return true, nil
+	})
+	if pollErr != nil && lastErr != nil {
+		return fmt.Errorf("%w: %v", pollErr, lastErr)
+	}
+	return pollErr
+}
+
+// WaitForAllMachinesLabeled polls until every Running, non-deleting Machine
+// has region and zone labels. After an Infrastructure spec change the CCM
+// syncs vCenter tags to these labels asynchronously.
+func WaitForAllMachinesLabeled(ctx context.Context, client machineclient.Interface, timeout time.Duration) error {
+	var lastErr error
+	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			lastErr = err
+			return false, nil
+		}
+		var unlabeled []string
+		for _, m := range machines.Items {
+			if m.DeletionTimestamp != nil {
+				continue
+			}
+			phase := ""
+			if m.Status.Phase != nil {
+				phase = *m.Status.Phase
+			}
+			if phase != "Running" {
+				continue
+			}
+			if m.Labels == nil || m.Labels[MachineRegionLabel] == "" || m.Labels[MachineZoneLabel] == "" {
+				unlabeled = append(unlabeled, m.Name)
+			}
+		}
+		if len(unlabeled) > 0 {
+			lastErr = fmt.Errorf("%d machines missing region/zone labels: %v", len(unlabeled), unlabeled)
 			return false, nil
 		}
 		lastErr = nil

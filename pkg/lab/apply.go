@@ -284,6 +284,9 @@ func waitForClusterReady(ctx context.Context, clients *framework.Clients) error 
 	if err := framework.WaitForAllNodesReady(ctx, clients.Kube, framework.LongTimeout); err != nil {
 		return fmt.Errorf("nodes not ready: %w", err)
 	}
+	if err := framework.WaitForAllMachinesLabeled(ctx, clients.Machine, framework.LongTimeout); err != nil {
+		return fmt.Errorf("machine labels not ready: %w", err)
+	}
 	return nil
 }
 

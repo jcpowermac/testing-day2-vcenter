@@ -73,7 +73,7 @@ plans/                  Test plan documents
 - Source ConfigMap: `openshift-config/cloud-provider-config`, data key `config`
 - Managed ConfigMap: `openshift-config-managed/kube-cloud-config`, data key `cloud.conf`
 - CCM ConfigMap: `openshift-cloud-controller-manager/cloud-conf`, data key `cloud.conf`
-- ClusterOperators checked: `cloud-controller-manager`, `config-operator`, `machine-api`
+- ClusterOperators checked: `cloud-controller-manager`, `config-operator`, `machine-api`, `storage`
 - Feature gate: `VSphereMultiVCenterDay2`
 
 ## Test Labels
