@@ -25,7 +25,15 @@ type credentialSecretTarget struct {
 	Format    credentialSecretFormat
 }
 
+// Secrets we update directly. The CCO reconciles downstream secrets
+// (e.g. openshift-machine-api/vsphere-cloud-credentials) from these.
 var vsphereCredentialSecretTargets = []credentialSecretTarget{
+	{Namespace: framework.VSphereCredsNamespace, Name: framework.VSphereCredsSecret, Format: credentialFormatPerVCenter},
+	{Namespace: framework.SourceConfigNamespace, Name: framework.CloudCredentialsSecret, Format: credentialFormatYAML},
+}
+
+// Secrets we back up for restore, including CCO-managed ones.
+var vsphereCredentialBackupTargets = []credentialSecretTarget{
 	{Namespace: framework.VSphereCredsNamespace, Name: framework.VSphereCredsSecret, Format: credentialFormatPerVCenter},
 	{Namespace: framework.SourceConfigNamespace, Name: framework.CloudCredentialsSecret, Format: credentialFormatYAML},
 	{Namespace: framework.MachineAPINamespace, Name: framework.VSphereMachineCredsSecret, Format: credentialFormatPerVCenter},
@@ -33,7 +41,7 @@ var vsphereCredentialSecretTargets = []credentialSecretTarget{
 
 func backupCredentialSecrets(ctx context.Context, kube kubernetes.Interface) (map[string]corev1.Secret, error) {
 	secrets := map[string]corev1.Secret{}
-	for _, target := range vsphereCredentialSecretTargets {
+	for _, target := range vsphereCredentialBackupTargets {
 		secret, err := kube.CoreV1().Secrets(target.Namespace).Get(ctx, target.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			continue
