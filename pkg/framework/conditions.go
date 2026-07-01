@@ -66,6 +66,7 @@ func WaitForClusterOperatorAvailable(ctx context.Context, client configclient.In
 // Progressing=False. This confirms the operator has finished rolling out.
 func WaitForClusterOperatorStable(ctx context.Context, client configclient.Interface, name string, timeout time.Duration) error {
 	var lastErr error
+	lastLog := time.Now()
 	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		co, err := client.ConfigV1().ClusterOperators().Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -91,6 +92,11 @@ func WaitForClusterOperatorStable(ctx context.Context, client configclient.Inter
 		if !availableOK || !degradedOK || !progressingOK {
 			lastErr = fmt.Errorf("clusteroperator %q: Available=%v Degraded=%v Progressing=%v",
 				name, availableOK, !degradedOK, !progressingOK)
+			if time.Since(lastLog) >= 30*time.Second {
+				fmt.Printf("  wait: operator %s: Available=%v Degraded=%v Progressing=%v\n",
+					name, availableOK, !degradedOK, !progressingOK)
+				lastLog = time.Now()
+			}
 			return false, nil
 		}
 		lastErr = nil
@@ -105,6 +111,7 @@ func WaitForClusterOperatorStable(ctx context.Context, client configclient.Inter
 // WaitForAllNodesReady polls until every Node has condition Ready=True.
 func WaitForAllNodesReady(ctx context.Context, client kubernetes.Interface, timeout time.Duration) error {
 	var lastErr error
+	lastLog := time.Now()
 	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -126,6 +133,10 @@ func WaitForAllNodesReady(ctx context.Context, client kubernetes.Interface, time
 		}
 		if len(notReady) > 0 {
 			lastErr = fmt.Errorf("%d nodes not Ready: %v", len(notReady), notReady)
+			if time.Since(lastLog) >= 30*time.Second {
+				fmt.Printf("  wait: %d/%d nodes not Ready: %v\n", len(notReady), len(nodes.Items), notReady)
+				lastLog = time.Now()
+			}
 			return false, nil
 		}
 		lastErr = nil

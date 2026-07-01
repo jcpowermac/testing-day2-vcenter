@@ -274,19 +274,27 @@ func vsphereHasServer(infra *configv1.Infrastructure, server string) bool {
 
 func waitForClusterReady(ctx context.Context, clients *framework.Clients) error {
 	for _, name := range []string{"cloud-controller-manager", "config-operator", "machine-api", "storage"} {
+		fmt.Printf("waiting for operator %s to stabilize...\n", name)
 		if err := framework.WaitForClusterOperatorStable(ctx, clients.Config, name, framework.LongTimeout); err != nil {
 			return fmt.Errorf("operator %q not stable: %w", name, err)
 		}
+		fmt.Printf("operator %s is stable\n", name)
 	}
+	fmt.Println("waiting for all Machines to be Running...")
 	if err := framework.WaitForAllMachinesHealthy(ctx, clients.Machine, framework.LongTimeout); err != nil {
 		return fmt.Errorf("machines not ready: %w", err)
 	}
+	fmt.Println("all Machines Running")
+	fmt.Println("waiting for all Nodes to be Ready...")
 	if err := framework.WaitForAllNodesReady(ctx, clients.Kube, framework.LongTimeout); err != nil {
 		return fmt.Errorf("nodes not ready: %w", err)
 	}
+	fmt.Println("all Nodes Ready")
+	fmt.Println("waiting for Machine region/zone labels...")
 	if err := framework.WaitForAllMachinesLabeled(ctx, clients.Machine, framework.LongTimeout); err != nil {
 		return fmt.Errorf("machine labels not ready: %w", err)
 	}
+	fmt.Println("all Machine labels synced")
 	return nil
 }
 

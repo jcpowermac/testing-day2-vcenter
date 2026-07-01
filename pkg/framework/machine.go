@@ -146,6 +146,39 @@ func WaitForMachineSetDrainedWithDelete(ctx context.Context, client machineclien
 	})
 }
 
+// WaitForMachineSetDrainedWithLog polls until a MachineSet has no Machines,
+// logging remaining Machine names and phases every 30 seconds.
+func WaitForMachineSetDrainedWithLog(ctx context.Context, client machineclient.Interface, msName string, timeout time.Duration) error {
+	lastLog := time.Now()
+	return wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+			LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+		})
+		if err != nil {
+			return false, nil
+		}
+		if len(machines.Items) == 0 {
+			return true, nil
+		}
+		if time.Since(lastLog) >= 30*time.Second {
+			for _, m := range machines.Items {
+				phase := "<unknown>"
+				if m.Status.Phase != nil {
+					phase = *m.Status.Phase
+				}
+				deleting := ""
+				if m.DeletionTimestamp != nil {
+					deleting = ", deleting"
+				}
+				fmt.Printf("  drain-wait: %s phase=%s%s\n", m.Name, phase, deleting)
+			}
+			fmt.Printf("  drain-wait: %d machine(s) remaining for %s\n", len(machines.Items), msName)
+			lastLog = time.Now()
+		}
+		return false, nil
+	})
+}
+
 // ForceDeleteMachineSetMachines deletes all Machines belonging to a MachineSet.
 func ForceDeleteMachineSetMachines(ctx context.Context, client machineclient.Interface, msName string) {
 	machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
@@ -163,6 +196,7 @@ func ForceDeleteMachineSetMachines(ctx context.Context, client machineclient.Int
 // "Running" phase. Returns an error listing unhealthy Machines on timeout.
 func WaitForAllMachinesHealthy(ctx context.Context, client machineclient.Interface, timeout time.Duration) error {
 	var lastErr error
+	lastLog := time.Now()
 	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -189,6 +223,10 @@ func WaitForAllMachinesHealthy(ctx context.Context, client machineclient.Interfa
 		}
 		if len(unhealthy) > 0 {
 			lastErr = fmt.Errorf("%d machines not Running: %v", len(unhealthy), unhealthy)
+			if time.Since(lastLog) >= 30*time.Second {
+				fmt.Printf("  wait: %d machine(s) not Running: %v\n", len(unhealthy), unhealthy)
+				lastLog = time.Now()
+			}
 			return false, nil
 		}
 		lastErr = nil
@@ -205,6 +243,7 @@ func WaitForAllMachinesHealthy(ctx context.Context, client machineclient.Interfa
 // syncs vCenter tags to these labels asynchronously.
 func WaitForAllMachinesLabeled(ctx context.Context, client machineclient.Interface, timeout time.Duration) error {
 	var lastErr error
+	lastLog := time.Now()
 	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -229,6 +268,10 @@ func WaitForAllMachinesLabeled(ctx context.Context, client machineclient.Interfa
 		}
 		if len(unlabeled) > 0 {
 			lastErr = fmt.Errorf("%d machines missing region/zone labels: %v", len(unlabeled), unlabeled)
+			if time.Since(lastLog) >= 30*time.Second {
+				fmt.Printf("  wait: %d machine(s) missing region/zone labels: %v\n", len(unlabeled), unlabeled)
+				lastLog = time.Now()
+			}
 			return false, nil
 		}
 		lastErr = nil

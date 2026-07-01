@@ -294,7 +294,7 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		}
 		GinkgoWriter.Printf("cleaning up MachineSet %s\n", msName)
 		_ = framework.ScaleMachineSet(suiteCtx, clients.Machine, msName, 0)
-		err := framework.WaitForMachineSetDrainedWithDelete(suiteCtx, clients.Machine, msName, framework.LongTimeout)
+		err := framework.WaitForMachineSetDrainedWithLog(suiteCtx, clients.Machine, msName, framework.LongTimeout)
 		if err != nil {
 			GinkgoWriter.Printf("MachineSet %s drain failed: %v, force-deleting remaining Machines\n", msName, err)
 			framework.ForceDeleteMachineSetMachines(suiteCtx, clients.Machine, msName)

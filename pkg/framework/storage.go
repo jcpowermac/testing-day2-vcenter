@@ -95,10 +95,15 @@ func DeleteNamespace(ctx context.Context, client kubernetes.Interface, name stri
 	if err != nil {
 		return fmt.Errorf("delete namespace %s: %w", name, err)
 	}
+	lastLog := time.Now()
 	return wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
+		}
+		if time.Since(lastLog) >= 30*time.Second {
+			fmt.Printf("  wait: namespace %s still terminating\n", name)
+			lastLog = time.Now()
 		}
 		return false, nil
 	})
@@ -188,6 +193,7 @@ func DeletePVC(ctx context.Context, client kubernetes.Interface, namespace, name
 // WaitForPVCBound polls until the PVC reaches Bound phase or timeout.
 func WaitForPVCBound(ctx context.Context, client kubernetes.Interface, namespace, name string, timeout time.Duration) (*corev1.PersistentVolumeClaim, error) {
 	var result *corev1.PersistentVolumeClaim
+	lastLog := time.Now()
 	err := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		pvc, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
@@ -196,6 +202,10 @@ func WaitForPVCBound(ctx context.Context, client kubernetes.Interface, namespace
 		if pvc.Status.Phase == corev1.ClaimBound {
 			result = pvc
 			return true, nil
+		}
+		if time.Since(lastLog) >= 30*time.Second {
+			fmt.Printf("  wait: PVC %s/%s phase=%s\n", namespace, name, pvc.Status.Phase)
+			lastLog = time.Now()
 		}
 		return false, nil
 	})
@@ -221,10 +231,15 @@ func DeletePV(ctx context.Context, client kubernetes.Interface, name string) err
 
 // WaitForPVDeleted polls until the PV no longer exists.
 func WaitForPVDeleted(ctx context.Context, client kubernetes.Interface, name string, timeout time.Duration) error {
+	lastLog := time.Now()
 	return wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
-		_, err := client.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
+		pv, err := client.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
+		}
+		if err == nil && time.Since(lastLog) >= 30*time.Second {
+			fmt.Printf("  wait: PV %s phase=%s still exists\n", name, pv.Status.Phase)
+			lastLog = time.Now()
 		}
 		return false, nil
 	})
@@ -343,12 +358,30 @@ func DeletePod(ctx context.Context, client kubernetes.Interface, namespace, name
 
 // WaitForPodRunning polls until a Pod reaches Running phase.
 func WaitForPodRunning(ctx context.Context, client kubernetes.Interface, namespace, name string, timeout time.Duration) error {
+	lastLog := time.Now()
 	return wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		pod, err := client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
-		return pod.Status.Phase == corev1.PodRunning, nil
+		if pod.Status.Phase == corev1.PodRunning {
+			return true, nil
+		}
+		if time.Since(lastLog) >= 30*time.Second {
+			reason := ""
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.State.Waiting != nil {
+					reason = cs.State.Waiting.Reason
+				}
+			}
+			if reason != "" {
+				fmt.Printf("  wait: pod %s/%s phase=%s reason=%s\n", namespace, name, pod.Status.Phase, reason)
+			} else {
+				fmt.Printf("  wait: pod %s/%s phase=%s\n", namespace, name, pod.Status.Phase)
+			}
+			lastLog = time.Now()
+		}
+		return false, nil
 	})
 }
 
@@ -369,6 +402,7 @@ func GetClusterCSIDriverCondition(ctx context.Context, client operatorclient.Int
 // WaitForClusterCSIDriverAvailable waits until Available=True and not Degraded.
 func WaitForClusterCSIDriverAvailable(ctx context.Context, client operatorclient.Interface, name string, timeout time.Duration) error {
 	var lastErr error
+	lastLog := time.Now()
 	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
 		csi, err := client.OperatorV1().ClusterCSIDrivers().Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -387,6 +421,12 @@ func WaitForClusterCSIDriverAvailable(ctx context.Context, client operatorclient
 				availableOK = csi.Status.Conditions[i].Status == operatorv1.ConditionTrue
 			case "Degraded":
 				degradedOK = csi.Status.Conditions[i].Status == operatorv1.ConditionFalse
+			}
+		}
+		if !availableOK || !degradedOK {
+			if time.Since(lastLog) >= 30*time.Second {
+				fmt.Printf("  wait: CSI driver %s: Available=%v Degraded=%v\n", name, availableOK, !degradedOK)
+				lastLog = time.Now()
 			}
 		}
 		lastErr = nil
