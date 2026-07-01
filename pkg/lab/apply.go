@@ -132,6 +132,10 @@ func Restore(ctx context.Context, clients *framework.Clients, stateDir string) e
 		if err != nil {
 			return err
 		}
+		// Skip CCO-managed secrets — the CCO reconciles them from root credentials.
+		if ns == framework.MachineAPINamespace && name == framework.VSphereMachineCredsSecret {
+			continue
+		}
 		current, getErr := clients.Kube.CoreV1().Secrets(ns).Get(ctx, name, metav1.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("get secret %s/%s: %w", ns, name, getErr)

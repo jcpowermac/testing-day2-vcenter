@@ -157,6 +157,11 @@ func WaitForAllMachinesHealthy(ctx context.Context, client machineclient.Interfa
 			if m.Status.Phase != nil {
 				phase = *m.Status.Phase
 			}
+			// Skip Failed Machines that were never provisioned (no NodeRef).
+			// These are dead CPMS replacements that won't self-heal.
+			if phase == "Failed" && m.Status.NodeRef == nil {
+				continue
+			}
 			if phase != "Running" {
 				unhealthy = append(unhealthy, fmt.Sprintf("%s(%s)", m.Name, phase))
 			}

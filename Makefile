@@ -57,6 +57,7 @@ test-real:
 	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=real-vcenter.xml --label-filter="real-vcenter" ./test/e2e/
 
 # Full end-to-end: baseline → apply → all tests → restore
+# Restore always runs after apply, even if tests fail.
 test-e2e:
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
 	@mkdir -p $(REPORT_DIR)
@@ -66,11 +67,13 @@ test-e2e:
 	go run ./cmd/day2-vcenter apply -config $(CONFIG)
 	@echo "=== Phase 2b: verify cluster readiness ==="
 	go run ./cmd/day2-vcenter verify -config $(CONFIG)
-	@echo "=== Phase 3: readonly (multi-vCenter) ==="
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase3-readonly.xml --label-filter="readonly" ./test/e2e/
-	@echo "=== Phase 4: mutating ==="
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase4-mutating.xml --label-filter="mutating" ./test/e2e/
-	@echo "=== Phase 5: storage ==="
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase5-storage.xml --label-filter="storage" ./test/e2e/
-	@echo "=== Phase 6: restore ==="
-	go run ./cmd/day2-vcenter restore -config $(CONFIG)
+	@rc=0; \
+	echo "=== Phase 3: readonly (multi-vCenter) ==="; \
+	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase3-readonly.xml --label-filter="readonly" ./test/e2e/ || rc=$$?; \
+	echo "=== Phase 4: mutating ==="; \
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase4-mutating.xml --label-filter="mutating" ./test/e2e/ || rc=$$?; \
+	echo "=== Phase 5: storage ==="; \
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase5-storage.xml --label-filter="storage" ./test/e2e/ || rc=$$?; \
+	echo "=== Phase 6: restore ==="; \
+	go run ./cmd/day2-vcenter restore -config $(CONFIG); \
+	exit $$rc
