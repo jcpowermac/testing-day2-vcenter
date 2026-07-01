@@ -153,6 +153,7 @@ func Verify(ctx context.Context, clients *framework.Clients, cfg *labconfig.LabC
 		"cloud-controller-manager",
 		"config-operator",
 		"machine-api",
+		"storage",
 	}); err != nil {
 		return err
 	}
@@ -268,7 +269,7 @@ func vsphereHasServer(infra *configv1.Infrastructure, server string) bool {
 }
 
 func waitForClusterReady(ctx context.Context, clients *framework.Clients) error {
-	for _, name := range []string{"cloud-controller-manager", "config-operator", "machine-api"} {
+	for _, name := range []string{"cloud-controller-manager", "config-operator", "machine-api", "storage"} {
 		if err := framework.WaitForClusterOperatorStable(ctx, clients.Config, name, framework.LongTimeout); err != nil {
 			return fmt.Errorf("operator %q not stable: %w", name, err)
 		}
