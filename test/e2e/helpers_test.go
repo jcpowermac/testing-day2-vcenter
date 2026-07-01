@@ -360,6 +360,12 @@ func createTestNamespaceWithCleanup(prefix string) string {
 	return ns
 }
 
+func createTestNamespace(prefix string) string {
+	ns, err := framework.CreateTestNamespace(suiteCtx, clients.Kube, prefix)
+	Expect(err).NotTo(HaveOccurred())
+	return ns
+}
+
 func requireCSITopologyKeys() *framework.CSITopologyKeys {
 	if csiTopoKeys == nil {
 		Skip("CSI topology keys not available — vCenter tag categories may not be configured")

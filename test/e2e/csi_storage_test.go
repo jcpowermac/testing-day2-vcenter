@@ -207,10 +207,11 @@ var _ = Describe("CSI storage provisioning baseline", Label("real-vcenter", "mut
 // Ordered so BeforeAll creates the MachineSet once and all specs share it.
 var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcenter", "mutating", "storage"), func() {
 	var (
-		lab       *labconfig.LabConfig
-		topoKeys  *framework.CSITopologyKeys
-		msName    string
-		msCreated bool
+		lab            *labconfig.LabConfig
+		topoKeys       *framework.CSITopologyKeys
+		msName         string
+		msCreated      bool
+		testNamespaces []string
 	)
 
 	BeforeAll(func() {
@@ -289,6 +290,15 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 	})
 
 	AfterAll(func() {
+		for _, ns := range testNamespaces {
+			GinkgoWriter.Printf("deleting test namespace %s before MachineSet teardown\n", ns)
+			err := framework.DeleteNamespace(suiteCtx, clients.Kube, ns, framework.DefaultTimeout)
+			if err != nil {
+				GinkgoWriter.Printf("namespace %s deletion failed: %v\n", ns, err)
+			}
+		}
+		testNamespaces = nil
+
 		if !msCreated || msName == "" {
 			return
 		}
@@ -304,7 +314,8 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 	It("should provision a PV in new failure domain with correct topology labels (N-CSI-05)", Label("p1"), func() {
 		sc := requireDefaultStorageClass()
-		ns := createTestNamespaceWithCleanup(framework.TestNamespacePrefix)
+		ns := createTestNamespace(framework.TestNamespacePrefix)
+		testNamespaces = append(testNamespaces, ns)
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-newfd-pvc", framework.TestPVCSize, sc.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -339,7 +350,8 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 	It("should provision PVC with explicit topology constraint in correct FD (N-CSI-06)", Label("p2"), func() {
 		defaultSC := requireDefaultStorageClass()
-		ns := createTestNamespaceWithCleanup(framework.TestNamespacePrefix)
+		ns := createTestNamespace(framework.TestNamespacePrefix)
+		testNamespaces = append(testNamespaces, ns)
 
 		topologyTerms := []corev1.TopologySelectorTerm{
 			{
@@ -374,7 +386,8 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 	It("should probe FD removal behavior when PVs exist in that FD (N-CSI-08)", Label("p1"), func() {
 		sc := requireDefaultStorageClass()
-		ns := createTestNamespaceWithCleanup(framework.TestNamespacePrefix)
+		ns := createTestNamespace(framework.TestNamespacePrefix)
+		testNamespaces = append(testNamespaces, ns)
 
 		pvc, err := framework.CreatePVC(suiteCtx, clients.Kube, ns, "csi-guard-pvc", framework.TestPVCSize, sc.Name)
 		Expect(err).NotTo(HaveOccurred())
@@ -422,7 +435,8 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 
 	It("should confirm vCenter removal blocked by existing xValidation, PV presence irrelevant (N-CSI-09)", Label("p1"), func() {
 		sc := requireDefaultStorageClass()
-		ns := createTestNamespaceWithCleanup(framework.TestNamespacePrefix)
+		ns := createTestNamespace(framework.TestNamespacePrefix)
+		testNamespaces = append(testNamespaces, ns)
 
 		infra := currentInfrastructure()
 		vcenters := framework.GetVCenters(infra)
