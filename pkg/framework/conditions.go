@@ -7,9 +7,11 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 )
 
 // GetClusterOperatorCondition returns a condition from a ClusterOperator.
@@ -96,6 +98,41 @@ func WaitForClusterOperatorStable(ctx context.Context, client configclient.Inter
 	})
 	if pollErr != nil && lastErr != nil {
 		return fmt.Errorf("%w: last error: %v", pollErr, lastErr)
+	}
+	return pollErr
+}
+
+// WaitForAllNodesReady polls until every Node has condition Ready=True.
+func WaitForAllNodesReady(ctx context.Context, client kubernetes.Interface, timeout time.Duration) error {
+	var lastErr error
+	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			lastErr = err
+			return false, nil
+		}
+		var notReady []string
+		for _, node := range nodes.Items {
+			ready := false
+			for _, c := range node.Status.Conditions {
+				if c.Type == corev1.NodeReady {
+					ready = c.Status == corev1.ConditionTrue
+					break
+				}
+			}
+			if !ready {
+				notReady = append(notReady, node.Name)
+			}
+		}
+		if len(notReady) > 0 {
+			lastErr = fmt.Errorf("%d nodes not Ready: %v", len(notReady), notReady)
+			return false, nil
+		}
+		lastErr = nil
+		return true, nil
+	})
+	if pollErr != nil && lastErr != nil {
+		return fmt.Errorf("%w: %v", pollErr, lastErr)
 	}
 	return pollErr
 }
