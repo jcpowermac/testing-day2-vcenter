@@ -8,148 +8,148 @@
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-GATE-01 | Gate appears in FeatureGate/cluster status with a version string | openshift/api | api#2783, CCO#481, CCO#489 |
-| N-GATE-02 | `IsFeatureGateEnabled` matches BeforeSuite cached result | openshift/api | api#2783 |
+| [N-GATE-01](tests/N-GATE-01.md) | Gate appears in FeatureGate/cluster status with a version string | openshift/api | api#2783, CCO#481, CCO#489 |
+| [N-GATE-02](tests/N-GATE-02.md) | `IsFeatureGateEnabled` matches BeforeSuite cached result | openshift/api | api#2783 |
 
 ## Infrastructure xValidation (`infrastructure_validation_test.go`) [readonly, validation, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-INF-00 | Dry-run adding a second vCenter is accepted | openshift/api | api#2784 |
-| N-INF-01/02 | Duplicate vCenter server values rejected by CRD uniqueness rule | openshift/api | api#2784 |
-| N-INF-03 | `vcenters:[]` rejected by minItems=1 rule | openshift/api | api#2784 |
-| N-INF-04 | `vcenters:null` rejected | openshift/api | api#2784 |
-| N-INF-05 | Swapping existing vCenter server triggers "Cannot add and remove at the same time" | openshift/api | api#2784 |
-| N-INF-06/07 | Replacing one vCenter with another in same patch triggers add-and-remove guard | openshift/api | api#2784 |
-| N-INF-08 | Ratcheting: identity-patch of current spec accepted (no-op update) | openshift/api | api#2784 |
-| N-INF-09 | Gate-off: adding a vCenter triggers immutability rule | openshift/api | api#2784 |
-| N-INF-10 | Gate-off: emptying vcenters list triggers immutability rule | openshift/api | api#2784 |
-| N-INF-11 | Exceeding 3 vCenters rejected by maxItems=3 rule | openshift/api | api#2784 |
-| N-INF-12 | Removing vCenter still referenced by FD. **Expected failure** — no xValidation rule | openshift/api | api#2784, SPLAT-2827 |
+| [N-INF-00](tests/N-INF-00.md) | Dry-run adding a second vCenter is accepted | openshift/api | api#2784 |
+| [N-INF-01/02](tests/N-INF-01-02.md) | Duplicate vCenter server values rejected by CRD uniqueness rule | openshift/api | api#2784 |
+| [N-INF-03](tests/N-INF-03.md) | `vcenters:[]` rejected by minItems=1 rule | openshift/api | api#2784 |
+| [N-INF-04](tests/N-INF-04.md) | `vcenters:null` rejected | openshift/api | api#2784 |
+| [N-INF-05](tests/N-INF-05.md) | Swapping existing vCenter server triggers "Cannot add and remove at the same time" | openshift/api | api#2784 |
+| [N-INF-06/07](tests/N-INF-06-07.md) | Replacing one vCenter with another in same patch triggers add-and-remove guard | openshift/api | api#2784 |
+| [N-INF-08](tests/N-INF-08.md) | Ratcheting: identity-patch of current spec accepted (no-op update) | openshift/api | api#2784 |
+| [N-INF-09](tests/N-INF-09.md) | Gate-off: adding a vCenter triggers immutability rule | openshift/api | api#2784 |
+| [N-INF-10](tests/N-INF-10.md) | Gate-off: emptying vcenters list triggers immutability rule | openshift/api | api#2784 |
+| [N-INF-11](tests/N-INF-11.md) | Exceeding 3 vCenters rejected by maxItems=3 rule | openshift/api | api#2784 |
+| [N-INF-12](tests/N-INF-12.md) | Removing vCenter still referenced by FD. **Expected failure** — no xValidation rule | openshift/api | api#2784, SPLAT-2827 |
 
 ## ValidatingAdmissionPolicies (`vap_test.go`) [readonly/mutating, admission, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-SEQ-00 | All 3 VAPs (machine, cpms, machineset) and bindings exist on cluster | cluster-config-operator | MAO#1510 |
-| N-SEQ-01 | Removing FD matching Machine region/zone labels denied by VAP (real patch, `mutating`) | cluster-config-operator | MAO#1510 |
-| N-SEQ-02 | Removing FD matching CPMS FD name reference denied by VAP (real patch, `mutating`) | cluster-config-operator | MAO#1510 |
-| N-SEQ-03 | Create 1-replica MachineSet, wait for Machine, removing its FD denied by VAP | cluster-config-operator | MAO#1510 |
-| N-SEQ-06 | Dry-run probes each FD to find one the API accepts for removal | cluster-config-operator | MAO#1510 |
-| N-SEQ-07 | Gate-off: Machine VAP is absent | cluster-config-operator | MAO#1510 |
+| [N-SEQ-00](tests/N-SEQ-00.md) | All 3 VAPs (machine, cpms, machineset) and bindings exist on cluster | cluster-config-operator | MAO#1510 |
+| [N-SEQ-01](tests/N-SEQ-01.md) | Removing FD matching Machine region/zone labels denied by VAP (real patch, `mutating`) | cluster-config-operator | MAO#1510 |
+| [N-SEQ-02](tests/N-SEQ-02.md) | Removing FD matching CPMS FD name reference denied by VAP (real patch, `mutating`) | cluster-config-operator | MAO#1510 |
+| [N-SEQ-03](tests/N-SEQ-03.md) | Create 1-replica MachineSet, wait for Machine, removing its FD denied by VAP | cluster-config-operator | MAO#1510 |
+| [N-SEQ-06](tests/N-SEQ-06.md) | Dry-run probes each FD to find one the API accepts for removal | cluster-config-operator | MAO#1510 |
+| [N-SEQ-07](tests/N-SEQ-07.md) | Gate-off: Machine VAP is absent | cluster-config-operator | MAO#1510 |
 
 ## Cloud Config Content (`configmap_content_test.go`) [readonly, config, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-CFG-01/02/03 | `openshift-config-managed/kube-cloud-config` parses as valid cloud config YAML | cluster-config-operator | CCMO#442, lib-go#2175, installer#10529 |
-| N-CFG-04 | `openshift-cloud-controller-manager/cloud-conf` parses as valid cloud config YAML | cloud-controller-manager | CCMO#442, installer#10529 |
-| N-CFG-05 | Every Infrastructure vCenter has a corresponding managed cloud config entry | cluster-config-operator | CCMO#442 |
-| N-CFG-06 | No stale vCenter entries in managed cloud config | cluster-config-operator | CCMO#469 |
-| N-CFG-07 | `insecure-flag` only set globally, not duplicated per-vCenter | cluster-config-operator | lib-go#2195 |
-| N-CFG-09 | Managed cloud config semantically matches Infrastructure CR and source ConfigMap | cluster-config-operator | CCMO#442, lib-go#2175 |
-| N-CFG-10 | `nodes` section has `externalNetworkSubnetCidr` or `internalNetworkSubnetCidr` | openshift/installer | installer#10614, lib-go#2195 |
+| [N-CFG-01/02/03](tests/N-CFG-01-02-03.md) | `openshift-config-managed/kube-cloud-config` parses as valid cloud config YAML | cluster-config-operator | CCMO#442, lib-go#2175, installer#10529 |
+| [N-CFG-04](tests/N-CFG-04.md) | `openshift-cloud-controller-manager/cloud-conf` parses as valid cloud config YAML | cloud-controller-manager | CCMO#442, installer#10529 |
+| [N-CFG-05](tests/N-CFG-05.md) | Every Infrastructure vCenter has a corresponding managed cloud config entry | cluster-config-operator | CCMO#442 |
+| [N-CFG-06](tests/N-CFG-06.md) | No stale vCenter entries in managed cloud config | cluster-config-operator | CCMO#469 |
+| [N-CFG-07](tests/N-CFG-07.md) | `insecure-flag` only set globally, not duplicated per-vCenter | cluster-config-operator | lib-go#2195 |
+| [N-CFG-09](tests/N-CFG-09.md) | Managed cloud config semantically matches Infrastructure CR and source ConfigMap | cluster-config-operator | CCMO#442, lib-go#2175 |
+| [N-CFG-10](tests/N-CFG-10.md) | `nodes` section has `externalNetworkSubnetCidr` or `internalNetworkSubnetCidr` | openshift/installer | installer#10614, lib-go#2195 |
 
 ## ConfigMap Ownership (`configmap_ownership_test.go`) [readonly/mutating, config, operator, p0/p1]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-CM-01 | Managed ConfigMap exists with `cloud.conf` data key | cluster-config-operator | CCMO#442, CCO#481 |
-| N-CM-02 | Managed ConfigMap stable over 60s observation window (single-writer) | cluster-config-operator | CCMO#442, CCO#481 |
-| N-CM-03 | CCM ConfigMap exists with `cloud.conf` data key | cloud-controller-manager | CCMO#442 |
-| N-OP-07 | Deleting managed ConfigMap triggers config-operator recreation | cluster-config-operator | CCO#481, CCO#489 |
+| [N-CM-01](tests/N-CM-01.md) | Managed ConfigMap exists with `cloud.conf` data key | cluster-config-operator | CCMO#442, CCO#481 |
+| [N-CM-02](tests/N-CM-02.md) | Managed ConfigMap stable over 60s observation window (single-writer) | cluster-config-operator | CCMO#442, CCO#481 |
+| [N-CM-03](tests/N-CM-03.md) | CCM ConfigMap exists with `cloud.conf` data key | cloud-controller-manager | CCMO#442 |
+| [N-OP-07](tests/N-OP-07.md) | Deleting managed ConfigMap triggers config-operator recreation | cluster-config-operator | CCO#481, CCO#489 |
 
 ## Credential Propagation (`credentials_test.go`) [readonly, integration, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-CRED-01 | All 4 consumer secrets have key entries for every Infrastructure vCenter | cloud-credential-operator | |
-| N-CRED-02 | Per-secret check for each consumer (skips if secret missing) | cloud-credential-operator | |
+| [N-CRED-01](tests/N-CRED-01.md) | All 4 consumer secrets have key entries for every Infrastructure vCenter | cloud-credential-operator | |
+| [N-CRED-02](tests/N-CRED-02.md) | Per-secret check for each consumer (skips if secret missing) | cloud-credential-operator | |
 
 ## Machine Integration (`machine_integration_test.go`) [readonly, integration, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-MACH-01 | Every non-deleting Machine is Running or Provisioned | machine-api-operator | |
-| N-MACH-02 | Every Machine has non-empty region/zone labels | cloud-controller-manager | CCMO#442 |
-| N-MACH-03 | Machine region/zone labels match an Infrastructure failure domain | cloud-controller-manager | CCMO#442, api#2784 |
-| N-MACH-04 | Machine workspace datacenter matches labeled FD topology | machine-api-operator | api#2784 |
+| [N-MACH-01](tests/N-MACH-01.md) | Every non-deleting Machine is Running or Provisioned | machine-api-operator | |
+| [N-MACH-02](tests/N-MACH-02.md) | Every Machine has non-empty region/zone labels | cloud-controller-manager | CCMO#442 |
+| [N-MACH-03](tests/N-MACH-03.md) | Machine region/zone labels match an Infrastructure failure domain | cloud-controller-manager | CCMO#442, api#2784 |
+| [N-MACH-04](tests/N-MACH-04.md) | Machine workspace datacenter matches labeled FD topology | machine-api-operator | api#2784 |
 
 ## CPMS Integration (`cpms_integration_test.go`) [readonly, integration, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-CPMS-01 | Every CPMS FD name exists in Infrastructure CR | machine-api-operator | MAO#1510, api#2784 |
-| N-CPMS-02 | Logs Infrastructure FDs not referenced by CPMS (informational) | machine-api-operator | MAO#1510 |
+| [N-CPMS-01](tests/N-CPMS-01.md) | Every CPMS FD name exists in Infrastructure CR | machine-api-operator | MAO#1510, api#2784 |
+| [N-CPMS-02](tests/N-CPMS-02.md) | Logs Infrastructure FDs not referenced by CPMS (informational) | machine-api-operator | MAO#1510 |
 
 ## MachineSet Integration (`machineset_integration_test.go`) [readonly, integration, p0]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-MS-01 | MachineSet workspace datacenter maps to known Infrastructure FD | machine-api-operator | api#2784 |
-| N-MS-02 | Region/zone labels on MachineSet templates match existing FDs | machine-api-operator | MAO#1510 |
+| [N-MS-01](tests/N-MS-01.md) | MachineSet workspace datacenter maps to known Infrastructure FD | machine-api-operator | api#2784 |
+| [N-MS-02](tests/N-MS-02.md) | Region/zone labels on MachineSet templates match existing FDs | machine-api-operator | MAO#1510 |
 
 ## CSI Driver Integration (`csi_integration_test.go`) [readonly, integration, p1]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-CSI-01 | CSI credential secret has keys for every Infrastructure vCenter | vmware-vsphere-csi-driver-operator | |
-| N-CSI-02 | CSI driver controller pods are Running | vmware-vsphere-csi-driver-operator | |
-| N-CSI-03 | Multi-vCenter cloud config includes all vCenters for CSI | vmware-vsphere-csi-driver-operator | CCMO#442 |
+| [N-CSI-01](tests/N-CSI-INT-01.md) | CSI credential secret has keys for every Infrastructure vCenter | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-02](tests/N-CSI-INT-02.md) | CSI driver controller pods are Running | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-03](tests/N-CSI-INT-03.md) | Multi-vCenter cloud config includes all vCenters for CSI | vmware-vsphere-csi-driver-operator | CCMO#442 |
 
-## CSI Storage Provisioning (`csi_storage_test.go`) [readonly/mutating, storage, p0–p2]
+## CSI Storage Provisioning (`csi_storage_test.go`) [readonly/mutating, storage, p0-p2]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-CSI-01 | ClusterCSIDriver Available and not Degraded | vmware-vsphere-csi-driver-operator | |
-| N-CSI-10 | Default StorageClass backed by vSphere CSI with WaitForFirstConsumer | vmware-vsphere-csi-driver-operator | |
-| N-CSI-11 | StorageClass topology plumbing connected to Infrastructure FDs | vmware-vsphere-csi-driver-operator | |
-| N-CSI-02 | CSI driver pods healthy with current Infrastructure topology | vmware-vsphere-csi-driver-operator | |
-| N-CSI-03 | CSI credential secret reflecting all vCenters | vmware-vsphere-csi-driver-operator | |
-| N-CSI-04 | Provision and bind PVC in existing failure domain | vmware-vsphere-csi-driver-operator | |
-| N-CSI-07 | PV deleted when PVC deleted with reclaimPolicy Delete | vmware-vsphere-csi-driver-operator | |
-| N-CSI-05 | Provision PV in new failure domain with correct topology labels. **Expected failure** — storage policy not propagated to second vCenter | vmware-vsphere-csi-driver-operator | |
-| N-CSI-06 | Provision PVC with explicit topology constraint in correct FD. **Expected failure** — storage policy gap | vmware-vsphere-csi-driver-operator | |
-| N-CSI-08 | Probe FD removal behavior when PVs exist in that FD | vmware-vsphere-csi-driver-operator, openshift/api | api#2784, MAO#1510 |
-| N-CSI-09 | vCenter removal blocked by xValidation while PVs present (PV irrelevant) | vmware-vsphere-csi-driver-operator, openshift/api | api#2784 |
+| [N-CSI-01](tests/N-CSI-STOR-01.md) | ClusterCSIDriver Available and not Degraded | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-10](tests/N-CSI-10.md) | Default StorageClass backed by vSphere CSI with WaitForFirstConsumer | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-11](tests/N-CSI-11.md) | StorageClass topology plumbing connected to Infrastructure FDs | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-02](tests/N-CSI-STOR-02.md) | CSI driver pods healthy with current Infrastructure topology | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-03](tests/N-CSI-STOR-03.md) | CSI credential secret reflecting all vCenters | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-04](tests/N-CSI-04.md) | Provision and bind PVC in existing failure domain | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-07](tests/N-CSI-07.md) | PV deleted when PVC deleted with reclaimPolicy Delete | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-05](tests/N-CSI-05.md) | Provision PV in new failure domain with correct topology labels. **Expected failure** — storage policy not propagated to second vCenter | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-06](tests/N-CSI-06.md) | Provision PVC with explicit topology constraint in correct FD. **Expected failure** — storage policy gap | vmware-vsphere-csi-driver-operator | |
+| [N-CSI-08](tests/N-CSI-08.md) | Probe FD removal behavior when PVs exist in that FD | vmware-vsphere-csi-driver-operator, openshift/api | api#2784, MAO#1510 |
+| [N-CSI-09](tests/N-CSI-09.md) | vCenter removal blocked by xValidation while PVs present (PV irrelevant) | vmware-vsphere-csi-driver-operator, openshift/api | api#2784 |
 
 ## Operator Health (`operator_health_test.go`) [readonly, operator, p0/p1]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-OP-01 | CCM, config-operator, machine-api are Available=True, Degraded=False | multiple | CCMO#442, CCO#481, MAO#1510 |
-| N-OP-02 | CCM pods have fewer than 5 restarts | cloud-controller-manager | CCMO#442 |
-| N-OP-03 | MAO pods have fewer than 5 restarts | machine-api-operator | MAO#1510 |
-| N-OP-04 | CSI driver controller pods have fewer than 5 restarts | vmware-vsphere-csi-driver-operator | |
+| [N-OP-01](tests/N-OP-01.md) | CCM, config-operator, machine-api are Available=True, Degraded=False | multiple | CCMO#442, CCO#481, MAO#1510 |
+| [N-OP-02](tests/N-OP-02.md) | CCM pods have fewer than 5 restarts | cloud-controller-manager | CCMO#442 |
+| [N-OP-03](tests/N-OP-03.md) | MAO pods have fewer than 5 restarts | machine-api-operator | MAO#1510 |
+| [N-OP-04](tests/N-OP-04.md) | CSI driver controller pods have fewer than 5 restarts | vmware-vsphere-csi-driver-operator | |
 
 ## vsphere-problem-detector (`problem_detector_test.go`) [readonly, operator, p1]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-VPD-01 | VPD deployment in `openshift-cluster-storage-operator` has >=1 available replica | vsphere-problem-detector | VPD#224 |
-| N-VPD-02 | VPD pods have fewer than 5 restarts | vsphere-problem-detector | VPD#224 |
-| N-CFG-08 | Validate GetVCenter after FD removal. Currently skipped pending upstream | vsphere-problem-detector | VPD#224 |
+| [N-VPD-01](tests/N-VPD-01.md) | VPD deployment in `openshift-cluster-storage-operator` has >=1 available replica | vsphere-problem-detector | VPD#224 |
+| [N-VPD-02](tests/N-VPD-02.md) | VPD pods have fewer than 5 restarts | vsphere-problem-detector | VPD#224 |
+| [N-CFG-08](tests/N-CFG-08.md) | Validate GetVCenter after FD removal. Currently skipped pending upstream | vsphere-problem-detector | VPD#224 |
 
 ## Topology Lifecycle (`topology_lifecycle_test.go`) [mutating, p0/p1]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-SEQ-05 | Dry-run removing Machine-backed FD denied by VAP (precheck) | cluster-config-operator | MAO#1510 |
-| N-SEQ-04 | Removing vCenter while FD remains. **Expected failure** — no xValidation rule | openshift/api | api#2784, SPLAT-2827 |
-| N-TOPO-01 | Create 1-replica MachineSet, removing its FD denied by VAP, scale down and cleanup | cluster-config-operator | MAO#1510 |
-| N-TOPO-02 | Add fake vCenter, wait for reconciliation, remove it, confirm no stale config | cluster-config-operator | CCMO#469 |
+| [N-SEQ-05](tests/N-SEQ-05.md) | Dry-run removing Machine-backed FD denied by VAP (precheck) | cluster-config-operator | MAO#1510 |
+| [N-SEQ-04](tests/N-SEQ-04.md) | Removing vCenter while FD remains. **Expected failure** — no xValidation rule | openshift/api | api#2784, SPLAT-2827 |
+| [N-TOPO-01](tests/N-TOPO-01.md) | Create 1-replica MachineSet, removing its FD denied by VAP, scale down and cleanup | cluster-config-operator | MAO#1510 |
+| [N-TOPO-02](tests/N-TOPO-02.md) | Add fake vCenter, wait for reconciliation, remove it, confirm no stale config | cluster-config-operator | CCMO#469 |
 
 ## Real vCenter Day 2 (`real_vcenter_test.go`) [real-vcenter, p0, mutating]
 
 | Test ID | Description | Component | PR/Issue |
 |---|---|---|---|
-| N-RVC-01 | Lab config's second vCenter appears in Infrastructure vcenters list | openshift/api | api#2784 |
-| N-RVC-02 | Managed cloud config includes all Infrastructure vCenters, no stale entries | cluster-config-operator | CCMO#442, CCMO#469 |
-| N-RVC-03 | Full `lab.Verify` workflow passes against live cluster | multiple | api#2784, CCMO#442 |
-| N-RVC-04 | Lab FD exists in Infrastructure with correct server reference | openshift/api | api#2784 |
-| N-RVC-05 | All 4 credential secrets have entries for second vCenter | cloud-credential-operator | |
-| N-RVC-06 | CCM, config-operator, machine-api are Available after Day 2 add | multiple | CCMO#442, CCO#481, MAO#1510 |
-| N-RVC-07 | CCM cloud config includes second vCenter server | cloud-controller-manager | CCMO#442 |
+| [N-RVC-01](tests/N-RVC-01.md) | Lab config's second vCenter appears in Infrastructure vcenters list | openshift/api | api#2784 |
+| [N-RVC-02](tests/N-RVC-02.md) | Managed cloud config includes all Infrastructure vCenters, no stale entries | cluster-config-operator | CCMO#442, CCMO#469 |
+| [N-RVC-03](tests/N-RVC-03.md) | Full `lab.Verify` workflow passes against live cluster | multiple | api#2784, CCMO#442 |
+| [N-RVC-04](tests/N-RVC-04.md) | Lab FD exists in Infrastructure with correct server reference | openshift/api | api#2784 |
+| [N-RVC-05](tests/N-RVC-05.md) | All 4 credential secrets have entries for second vCenter | cloud-credential-operator | |
+| [N-RVC-06](tests/N-RVC-06.md) | CCM, config-operator, machine-api are Available after Day 2 add | multiple | CCMO#442, CCO#481, MAO#1510 |
+| [N-RVC-07](tests/N-RVC-07.md) | CCM cloud config includes second vCenter server | cloud-controller-manager | CCMO#442 |
 
 ## PR Reference
 
