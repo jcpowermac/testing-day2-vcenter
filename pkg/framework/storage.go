@@ -437,3 +437,27 @@ func WaitForClusterCSIDriverAvailable(ctx context.Context, client operatorclient
 	}
 	return pollErr
 }
+
+// GetCSIDriverConfig reads the CSI driver cloud config from the operator namespace.
+func GetCSIDriverConfig(ctx context.Context, client kubernetes.Interface) (string, error) {
+	cm, err := client.CoreV1().ConfigMaps(CSIDriverNamespace).Get(ctx, "vmware-vsphere-csi-driver-config", metav1.GetOptions{})
+	if err != nil {
+		secret, sErr := client.CoreV1().Secrets(CSIDriverNamespace).Get(ctx, "vmware-vsphere-cloud-provider-config", metav1.GetOptions{})
+		if sErr != nil {
+			return "", fmt.Errorf("CSI driver config not found as ConfigMap or Secret: %v / %v", err, sErr)
+		}
+		for _, v := range secret.Data {
+			return string(v), nil
+		}
+		return "", fmt.Errorf("CSI driver config Secret has no data")
+	}
+	for _, v := range cm.Data {
+		return v, nil
+	}
+	return "", fmt.Errorf("CSI driver config ConfigMap has no data")
+}
+
+// CSIConfigHasVCenter checks if a cloud config string references a vCenter hostname.
+func CSIConfigHasVCenter(config, vcenterHost string) bool {
+	return strings.Contains(config, vcenterHost)
+}

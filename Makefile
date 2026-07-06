@@ -1,4 +1,4 @@
-.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-real test-e2e apply-lab restore-lab verify-lab
+.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-real test-e2e apply-lab restore-lab verify-lab
 
 GINKGO ?= $(shell go env GOPATH)/bin/ginkgo
 GINKGO_FLAGS ?= -v
@@ -50,6 +50,11 @@ test-storage:
 test-storage-readonly:
 	@mkdir -p $(REPORT_DIR)
 	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=storage-readonly.xml --label-filter="storage && readonly" ./test/e2e/
+
+test-csi-operator:
+	@mkdir -p $(REPORT_DIR)
+	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-operator.xml --label-filter="csi-operator" ./test/e2e/
 
 test-real:
 	@mkdir -p $(REPORT_DIR)

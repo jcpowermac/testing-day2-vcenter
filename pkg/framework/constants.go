@@ -44,8 +44,14 @@ const (
 	TestNamespacePrefix = "e2e-csi-storage"
 	BusyboxImage        = "registry.k8s.io/e2e-test-images/busybox:1.36.1-1"
 
-	DefaultTimeout = 5 * time.Minute
+	// CSI operator lifecycle constants (from vmware-vsphere-csi-driver-operator PR #348, commit acb68c32)
+	OrphanCleanupPendingCondition = "VMwareVSphereDriverStorageClassControllerOrphanCleanupPending"
+	ForceOrphanCleanupAnnotation  = "csi.vsphere.vmware.com/force-orphan-cleanup"
+	TagOperationsMetric           = "vsphere_csi_tag_operations_total"
+	OrphanTagsDetectedMetric      = "vsphere_csi_orphan_tags_detected_total"
+DefaultTimeout = 5 * time.Minute
 	DefaultPolling = 10 * time.Second
 	ShortTimeout   = 30 * time.Second
 	LongTimeout    = 15 * time.Minute
+	OperatorSyncTimeout = 12 * time.Minute
 )

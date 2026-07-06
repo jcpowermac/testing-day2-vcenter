@@ -151,6 +151,29 @@
 | [N-RVC-06](tests/N-RVC-06.md) | CCM, config-operator, machine-api are Available after Day 2 add | multiple | CCMO#442, CCO#481, MAO#1510 |
 | [N-RVC-07](tests/N-RVC-07.md) | CCM cloud config includes second vCenter server | cloud-controller-manager | CCMO#442 |
 
+## CSI Operator FD Lifecycle (`csi_operator_lifecycle_test.go`) [mutating, csi-operator, p0-p2]
+
+| Test ID | Description | Component | PR/Issue |
+|---|---|---|---|
+| [FD-ADD-01](tests/FD-ADD-01.md) | Operator tags new FD's datastore with cluster tag | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [FD-ADD-02](tests/FD-ADD-02.md) | SPBM profile exists on second vCenter after FD add | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [FD-ADD-03](tests/FD-ADD-03.md) | Operator conditions healthy after FD add | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [FD-ADD-04](tests/FD-ADD-04.md) | CSI driver config includes second vCenter | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [FD-REM-01](tests/FD-REM-01.md) | Orphan tag detached after FD removal, re-attached after restore | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [FD-REM-02](tests/FD-REM-02.md) | StorageClass and SPBM profile survive FD removal | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [FD-REM-03](tests/FD-REM-03.md) | Operator reconciles within backoff window | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [PV-SAFE-01](tests/PV-SAFE-01.md) | Orphan tag blocked when PVs exist on datastore | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [PV-SAFE-02](tests/PV-SAFE-02.md) | Orphan cleanup proceeds after PVs deleted | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [PV-SAFE-03](tests/PV-SAFE-03.md) | Force cleanup annotation overrides PV safety | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [VC-REM-01](tests/VC-REM-01.md) | Complete vCenter removal lifecycle (FD→tag→SPBM→vCenter) | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [VC-REM-02](tests/VC-REM-02.md) | CSI driver config updated after vCenter removal | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [VC-REM-03](tests/VC-REM-03.md) | Credential secrets after vCenter removal [observational] | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [EDGE-02](tests/EDGE-02.md) | Backoff resets after successful sync | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [EDGE-03](tests/EDGE-03.md) | Topology transition 2 FDs → 1 FD → 2 FDs | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [OBS-01](tests/OBS-01.md) | OrphanTagsDetectedTotal metric incremented on FD removal | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [OBS-02](tests/OBS-02.md) | TagOperationsTotal tracks detach operations | vmware-vsphere-csi-driver-operator | csi-op#348 |
+| [OBS-03](tests/OBS-03.md) | TagOperationsTotal tracks PV-blocked skips | vmware-vsphere-csi-driver-operator | csi-op#348 |
+
 ## PR Reference
 
 | Short Name | Full Reference | JIRA | Title |
@@ -167,3 +190,4 @@
 | lib-go#2195 | [openshift/library-go#2195](https://github.com/openshift/library-go/pull/2195) | SPLAT-2651 | Changed Node struct to not be pointer in CPIConfig |
 | MAO#1510 | [openshift/machine-api-operator#1510](https://github.com/openshift/machine-api-operator/pull/1510) | SPLAT-2790 | Added new VAP for vSphere infra validation |
 | VPD#224 | [openshift/vsphere-problem-detector#224](https://github.com/openshift/vsphere-problem-detector/pull/224) | OCPBUGS-87906 | Fixed GetVCenter to handle removed FDs better |
+| csi-op#348 | [openshift/vmware-vsphere-csi-driver-operator#348](https://github.com/openshift/vmware-vsphere-csi-driver-operator/pull/348) | | FD lifecycle: orphan tag cleanup, SPBM profile management, PV-safe detach |

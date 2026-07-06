@@ -12,6 +12,7 @@ make test-p0              # run p0 readonly tests only
 make test-mutating        # run mutating tests (changes cluster state, restores after)
 make test-storage         # run storage provisioning tests (needs lab config)
 make test-storage-readonly # storage tests that don't provision PVCs
+make test-csi-operator    # run CSI operator FD lifecycle tests (needs lab config)
 make test-real            # run tests requiring a real second vCenter (needs config/lab.yaml)
 make test-e2e             # full end-to-end: baseline → apply → verify → all tests → restore
 make apply-lab            # add second vCenter to cluster using lab config
@@ -62,6 +63,7 @@ test/e2e/               Ginkgo e2e test suites
   operator_health_test.go             ClusterOperator health checks
   topology_lifecycle_test.go          Mutating lifecycle tests
   csi_storage_test.go                 CSI storage provisioning tests
+  csi_operator_lifecycle_test.go      CSI operator FD lifecycle tests (tag/SPBM/PV-safety)
   real_vcenter_test.go                Tests requiring real second vCenter
   problem_detector_test.go            vsphere-problem-detector tests (stub)
 config/lab.yaml.example Lab config template
@@ -85,6 +87,7 @@ plans/                  Test plan documents
 - `admission` — ValidatingAdmissionPolicy tests
 - `config` — cloud config content tests
 - `operator` — ClusterOperator health tests
+- `csi-operator` — CSI operator FD lifecycle tests (tag cleanup, SPBM, PV safety)
 - `real-vcenter` — requires lab config with real second vCenter
 
 ## Known Issues
