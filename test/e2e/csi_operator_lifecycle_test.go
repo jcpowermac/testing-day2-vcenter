@@ -176,8 +176,8 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Label("csi-ope
 			Expect(tagged).To(BeTrue(), "datastore %s should be tagged with %q", fd.Topology.Datastore, tagName)
 
 			sc := requireDefaultStorageClass()
-			Expect(sc.Parameters).To(HaveKey("storagePolicyName"),
-				"default StorageClass should have storagePolicyName parameter")
+			Expect(sc.Parameters).To(HaveKey("StoragePolicyName"),
+				"default StorageClass should have StoragePolicyName parameter")
 		})
 
 		It("FD-ADD-02: SPBM profile exists on second vCenter", Label("p0"), func() {
@@ -266,7 +266,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Label("csi-ope
 				waitForOrphanConditionFalse(framework.DefaultTimeout)
 
 				sc := requireDefaultStorageClass()
-				Expect(sc.Parameters).To(HaveKey("storagePolicyName"))
+				Expect(sc.Parameters).To(HaveKey("StoragePolicyName"))
 			})
 
 			// After restore, verify tag is re-attached
@@ -290,8 +290,8 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Label("csi-ope
 				waitForStorageOperatorHealthy(framework.OperatorSyncTimeout)
 
 				sc := requireDefaultStorageClass()
-				Expect(sc.Parameters).To(HaveKey("storagePolicyName"),
-					"StorageClass should retain storagePolicyName after FD removal")
+				Expect(sc.Parameters).To(HaveKey("StoragePolicyName"),
+					"StorageClass should retain StoragePolicyName after FD removal")
 
 				primarySess := primaryVCenterSession()
 				defer primarySess.Close(suiteCtx)
@@ -604,7 +604,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Label("csi-ope
 			waitForStorageOperatorHealthy(framework.OperatorSyncTimeout)
 
 			sc := requireDefaultStorageClass()
-			Expect(sc.Parameters).To(HaveKey("storagePolicyName"))
+			Expect(sc.Parameters).To(HaveKey("StoragePolicyName"))
 
 			config, err := framework.GetCSIDriverConfig(suiteCtx, clients.Kube)
 			Expect(err).NotTo(HaveOccurred())
@@ -738,7 +738,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Label("csi-ope
 				waitForStorageOperatorHealthy(framework.OperatorSyncTimeout)
 
 				sc := requireDefaultStorageClass()
-				Expect(sc.Parameters).To(HaveKey("storagePolicyName"),
+				Expect(sc.Parameters).To(HaveKey("StoragePolicyName"),
 					"StorageClass should persist through topology transition")
 			})
 
