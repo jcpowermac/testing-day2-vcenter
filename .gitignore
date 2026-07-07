@@ -2,6 +2,7 @@ config/lab.yaml
 .lab-state/
 bin/
 reports/
+results/
 .idea/
 *.pem
 *.key

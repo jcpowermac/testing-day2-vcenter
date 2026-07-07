@@ -1,4 +1,4 @@
-.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-csi-topology test-csi-orphan test-real test-e2e apply-lab restore-lab verify-lab
+.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-csi-topology test-csi-orphan test-real test-e2e apply-lab restore-lab verify-lab aggregate-junit
 
 GINKGO ?= $(shell go env GOPATH)/bin/ginkgo
 GINKGO_FLAGS ?= -v
@@ -98,3 +98,7 @@ test-e2e:
 	echo "=== Phase 6: restore ==="; \
 	go run ./cmd/day2-vcenter restore -config $(CONFIG); \
 	exit $$rc
+
+aggregate-junit:
+	@test -d results || (echo "no results/ directory — run hack/test-grid.sh first"; exit 1)
+	go run ./cmd/aggregate-junit ./results
