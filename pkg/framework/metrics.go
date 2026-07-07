@@ -32,7 +32,7 @@ func ScrapeOperatorMetrics(ctx context.Context, client kubernetes.Interface, nam
 
 	body, err := client.CoreV1().
 		Pods(namespace).
-		ProxyGet("https", podName, "8443", "/metrics", nil).
+		ProxyGet("https", podName, "8445", "/metrics", nil).
 		DoRaw(ctx)
 	if err != nil {
 		return "", fmt.Errorf("scrape metrics from pod %s: %w", podName, err)
