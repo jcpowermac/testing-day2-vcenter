@@ -367,7 +367,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			waitForOrphanConditionFalse(framework.ShortTimeout)
 
 			pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube,
-				framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+				framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 			Expect(err).NotTo(HaveOccurred())
 			for _, pod := range pods {
 				restarts := framework.PodRestartCount(&pod)
@@ -911,7 +911,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 
 			GinkgoWriter.Println("scraping operator metrics (before)")
 			beforeMetrics, err := framework.ScrapeOperatorMetrics(suiteCtx, clients.Kube,
-				framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+				framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 			if err != nil {
 				Skip(fmt.Sprintf("cannot scrape operator metrics: %v", err))
 			}
@@ -924,7 +924,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 
 				GinkgoWriter.Println("  scraping operator metrics (after)")
 				afterMetrics, mErr := framework.ScrapeOperatorMetrics(suiteCtx, clients.Kube,
-					framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+					framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 				Expect(mErr).NotTo(HaveOccurred())
 				afterVal, parseErr := framework.ParseMetricValue(afterMetrics, framework.OrphanTagsDetectedMetric, nil)
 				Expect(parseErr).NotTo(HaveOccurred())
@@ -941,7 +941,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 
 			GinkgoWriter.Println("scraping operator metrics (before)")
 			beforeMetrics, err := framework.ScrapeOperatorMetrics(suiteCtx, clients.Kube,
-				framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+				framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 			if err != nil {
 				Skip(fmt.Sprintf("cannot scrape operator metrics: %v", err))
 			}
@@ -954,7 +954,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 
 				GinkgoWriter.Println("  scraping operator metrics (after)")
 				afterMetrics, mErr := framework.ScrapeOperatorMetrics(suiteCtx, clients.Kube,
-					framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+					framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 				Expect(mErr).NotTo(HaveOccurred())
 				afterVal, parseErr := framework.ParseMetricValue(afterMetrics, framework.TagOperationsMetric, detachLabels)
 				Expect(parseErr).NotTo(HaveOccurred())
@@ -1001,7 +1001,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 
 			GinkgoWriter.Println("scraping operator metrics (before)")
 			beforeMetrics, mErr := framework.ScrapeOperatorMetrics(suiteCtx, clients.Kube,
-				framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+				framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 			if mErr != nil {
 				Skip(fmt.Sprintf("cannot scrape operator metrics: %v", mErr))
 			}
@@ -1015,7 +1015,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 
 				GinkgoWriter.Println("  scraping operator metrics (after)")
 				afterMetrics, afterErr := framework.ScrapeOperatorMetrics(suiteCtx, clients.Kube,
-					framework.CSIDriverNamespace, "app=vmware-vsphere-csi-driver-operator")
+					framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 				Expect(afterErr).NotTo(HaveOccurred())
 
 				afterSkip, parseErr := framework.ParseMetricValue(afterMetrics, framework.TagOperationsMetric, skipLabels)
