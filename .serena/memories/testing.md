@@ -11,6 +11,9 @@ Always use `make -C <path> <target>`. Never rsync — use git push/pull.
 - `make test-readonly` — safe readonly tests (no cluster mutation)
 - `make test-storage` — CSI storage tests (label filter: storage)
 - `make test-storage-readonly` — storage tests that don't provision PVCs
+- `make test-csi-operator` — full CSI operator suite (FD lifecycle + topology + orphan, label: csi-operator)
+- `make test-csi-topology` — ClusterCSIDriver topology config tests, no lab config required (label: csi-topology)
+- `make test-csi-orphan` — synthetic orphan tag tests, requires lab config + `make apply-lab` already run (label: csi-orphan)
 - `make test-p0` — p0 priority readonly tests
 - `make test-mutating` — mutating tests (backup/restore)
 - `make test-real` — requires `config/lab.yaml` with real second vCenter
@@ -43,6 +46,9 @@ Default `GINKGO_FLAGS=-v`. Override to control behavior:
 - `topology_lifecycle_test.go` — mutating add/remove + 0-replica MS VAP probe
 - `real_vcenter_test.go` — real second vCenter end-to-end verification
 - `csi_storage_test.go` — CSI storage provisioning, topology, FD removal probes (N-CSI-*). AfterAll force-deletes orphaned Machines if drain times out.
+- `csi_operator_lifecycle_test.go` — CSI operator FD lifecycle tests (FD-ADD/FD-REM/PV-SAFE/VC-REM/EDGE/OBS). Shared helpers (`waitForTagDetached`, `waitForOrphanConditionFalse`, etc.) live here at package level and are reused by `csi_topology_config_test.go`/`csi_orphan_tag_test.go`.
+- `csi_topology_config_test.go` — ClusterCSIDriver `topologyCategories` config + Infrastructure precedence tests (TOPO-01–06). TOPO-06 is the only mutating test.
+- `csi_orphan_tag_test.go` — synthetic orphan tag tests (SYNTH-01/02/04/05/09/10): tags a non-FD datastore directly via govmomi instead of removing an Infrastructure FD, sidestepping the Machine-label VAP gap. Scoped to second vCenter only; requires `orphanTest.datastore` in lab config or auto-discovery via `vsphere.FindNonFDDatastore`. PV-blocked variants (SYNTH-06/07/08) deferred — see `plans/new-csi-operator-test-topology-config.md`.
 - `problem_detector_test.go` — vsphere-problem-detector (stub)
 
 ## Guards

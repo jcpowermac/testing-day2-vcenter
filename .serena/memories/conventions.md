@@ -13,3 +13,4 @@
 - Never write to CCO-managed secrets (`openshift-machine-api/vsphere-cloud-credentials`) — update root secrets and let CCO reconcile
 - `CreateTestNamespace` waits for SCC `sa.scc.uid-range` annotation before returning — required for pod creation on OpenShift
 - CSI test AfterAll force-deletes orphaned Machines if MachineSet drain times out, preventing VAP from blocking restore
+- `pkg/vsphere` tag helpers (`AttachTagToDatastore`, `DetachTagFromDatastore`, `IsDatastoreTagged`) all accept a tag *name*, not ID, and resolve internally — keep new tag helpers consistent with this

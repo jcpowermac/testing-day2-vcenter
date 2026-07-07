@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vapi/tags"
 	"k8s.io/klog/v2"
@@ -124,4 +125,94 @@ func ListTaggedDatastoreNames(ctx context.Context, s *Session, tagID string) ([]
 	}
 
 	return names, nil
+}
+
+// resolveTagIDByName finds a tag's ID by name, searching across all categories.
+func resolveTagIDByName(ctx context.Context, s *Session, tagName string) (string, error) {
+	tagList, err := s.TagManager.GetTags(ctx)
+	if err != nil {
+		return "", fmt.Errorf("listing tags: %w", err)
+	}
+	for i := range tagList {
+		if tagList[i].Name == tagName {
+			return tagList[i].ID, nil
+		}
+	}
+	return "", fmt.Errorf("tag %q not found", tagName)
+}
+
+// AttachTagToDatastore attaches the named tag to the datastore at the given
+// inventory path. Idempotent — attaching an already-attached tag is a no-op.
+func AttachTagToDatastore(ctx context.Context, s *Session, datastorePath, tagName string) error {
+	log := klog.FromContext(ctx)
+	log.V(2).Info("attaching tag to datastore", "datastore", datastorePath, "tag", tagName)
+
+	ds, err := s.Finder.Datastore(ctx, datastorePath)
+	if err != nil {
+		return fmt.Errorf("finding datastore %q: %w", datastorePath, err)
+	}
+
+	tagID, err := resolveTagIDByName(ctx, s, tagName)
+	if err != nil {
+		return err
+	}
+
+	if err := s.TagManager.AttachTag(ctx, tagID, ds.Reference()); err != nil {
+		return fmt.Errorf("attaching tag %q to datastore %q: %w", tagName, datastorePath, err)
+	}
+	return nil
+}
+
+// DetachTagFromDatastore detaches the named tag from the datastore at the given
+// inventory path. Idempotent — detaching an already-detached tag is a no-op.
+func DetachTagFromDatastore(ctx context.Context, s *Session, datastorePath, tagName string) error {
+	log := klog.FromContext(ctx)
+	log.V(2).Info("detaching tag from datastore", "datastore", datastorePath, "tag", tagName)
+
+	ds, err := s.Finder.Datastore(ctx, datastorePath)
+	if err != nil {
+		return fmt.Errorf("finding datastore %q: %w", datastorePath, err)
+	}
+
+	tagID, err := resolveTagIDByName(ctx, s, tagName)
+	if err != nil {
+		return err
+	}
+
+	if err := s.TagManager.DetachTag(ctx, tagID, ds.Reference()); err != nil {
+		return fmt.Errorf("detaching tag %q from datastore %q: %w", tagName, datastorePath, err)
+	}
+	return nil
+}
+
+// FindNonFDDatastore finds a datastore in the session's datacenter that is not
+// referenced by any of the given failure domains' Topology.Datastore path.
+// Returns ("", false, nil) if every datastore in the datacenter belongs to a
+// failure domain. The chosen datastore is logged for operator visibility,
+// since attaching a synthetic orphan tag to the wrong datastore has blast
+// radius.
+func FindNonFDDatastore(ctx context.Context, s *Session, fds []configv1.VSpherePlatformFailureDomainSpec) (string, bool, error) {
+	log := klog.FromContext(ctx)
+
+	fdPaths := map[string]bool{}
+	for _, fd := range fds {
+		fdPaths[fd.Topology.Datastore] = true
+	}
+
+	datastores, err := s.Finder.DatastoreList(ctx, "*")
+	if err != nil {
+		return "", false, fmt.Errorf("listing datastores in datacenter %q: %w", s.Datacenter, err)
+	}
+
+	for _, ds := range datastores {
+		path := ds.InventoryPath
+		if fdPaths[path] {
+			continue
+		}
+		log.Info("selected non-FD datastore for synthetic orphan tag testing", "datastore", path)
+		return path, true, nil
+	}
+
+	log.Info("no non-FD datastore found in datacenter", "datacenter", s.Datacenter)
+	return "", false, nil
 }

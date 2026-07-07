@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -72,7 +73,7 @@ func CreateTestNamespace(ctx context.Context, client kubernetes.Interface, prefi
 	if err != nil {
 		return "", fmt.Errorf("create test namespace: %w", err)
 	}
-	err = wait.PollUntilContextTimeout(ctx, time.Second, ShortTimeout, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, time.Second, DefaultTimeout, true, func(ctx context.Context) (bool, error) {
 		got, err := client.CoreV1().Namespaces().Get(ctx, created.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
@@ -457,4 +458,104 @@ func GetCSIDriverConfig(ctx context.Context, client kubernetes.Interface) (strin
 // CSIConfigHasVCenter checks if a cloud config string references a vCenter hostname.
 func CSIConfigHasVCenter(config, vcenterHost string) bool {
 	return strings.Contains(config, vcenterHost)
+}
+
+// csiConfigTopologyCategoriesPattern matches the "topology-categories" key
+// written by the CSI driver operator into the [Labels] section of cloud.conf,
+// e.g. `topology-categories = openshift-region,openshift-zone`.
+var csiConfigTopologyCategoriesPattern = regexp.MustCompile(`(?m)^\s*topology-categories\s*=\s*(.+?)\s*$`)
+
+// CSIConfigTopologyCategories extracts the comma-separated category names from
+// the [Labels] topology-categories entry in a CSI driver cloud.conf string.
+// Returns ok=false if the key is absent.
+func CSIConfigTopologyCategories(config string) (categories []string, ok bool) {
+	m := csiConfigTopologyCategoriesPattern.FindStringSubmatch(config)
+	if m == nil {
+		return nil, false
+	}
+	value := strings.Trim(m[1], `"`)
+	for _, c := range strings.Split(value, ",") {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			categories = append(categories, c)
+		}
+	}
+	return categories, true
+}
+
+// GetCSIProvisionerArgs returns the Args slice of the "csi-provisioner" container
+// in the vSphere CSI driver controller Deployment.
+func GetCSIProvisionerArgs(ctx context.Context, client kubernetes.Interface) ([]string, error) {
+	deploy, err := client.AppsV1().Deployments(CSIDriverNamespace).Get(ctx, CSIControllerDeployment, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get deployment %s/%s: %w", CSIDriverNamespace, CSIControllerDeployment, err)
+	}
+	for i := range deploy.Spec.Template.Spec.Containers {
+		c := &deploy.Spec.Template.Spec.Containers[i]
+		if c.Name == CSIProvisionerContainer {
+			return c.Args, nil
+		}
+	}
+	return nil, fmt.Errorf("container %q not found in deployment %s/%s", CSIProvisionerContainer, CSIDriverNamespace, CSIControllerDeployment)
+}
+
+// GetFeatureConfigMapData returns the data of the CSI driver's internal
+// feature states ConfigMap.
+func GetFeatureConfigMapData(ctx context.Context, client kubernetes.Interface) (map[string]string, error) {
+	cm, err := client.CoreV1().ConfigMaps(CSIDriverNamespace).Get(ctx, FeatureStatesConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get configmap %s/%s: %w", CSIDriverNamespace, FeatureStatesConfigMap, err)
+	}
+	return cm.Data, nil
+}
+
+// GetCSINodeTopologyKeys lists CSINode objects and collects the deduplicated
+// set of topology keys registered by the vSphere CSI driver (prefix
+// CSITopologyKeyPrefix).
+func GetCSINodeTopologyKeys(ctx context.Context, client kubernetes.Interface) ([]string, error) {
+	csiNodes, err := client.StorageV1().CSINodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list CSINodes: %w", err)
+	}
+
+	seen := map[string]bool{}
+	var keys []string
+	for _, csiNode := range csiNodes.Items {
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name != ClusterCSIDriverName {
+				continue
+			}
+			for _, key := range driver.TopologyKeys {
+				if !strings.HasPrefix(key, CSITopologyKeyPrefix) {
+					continue
+				}
+				if !seen[key] {
+					seen[key] = true
+					keys = append(keys, key)
+				}
+			}
+		}
+	}
+	return keys, nil
+}
+
+// SetClusterCSIDriverTopologyCategories patches spec.driverConfig.vSphere.topologyCategories
+// on the vSphere ClusterCSIDriver. Pass nil categories to clear the field.
+func SetClusterCSIDriverTopologyCategories(ctx context.Context, client operatorclient.Interface, categories []string) error {
+	ccd, err := client.OperatorV1().ClusterCSIDrivers().Get(ctx, ClusterCSIDriverName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get clustercsidriver %q: %w", ClusterCSIDriverName, err)
+	}
+
+	ccd.Spec.DriverConfig.DriverType = operatorv1.VSphereDriverType
+	if ccd.Spec.DriverConfig.VSphere == nil {
+		ccd.Spec.DriverConfig.VSphere = &operatorv1.VSphereCSIDriverConfigSpec{}
+	}
+	ccd.Spec.DriverConfig.VSphere.TopologyCategories = categories
+
+	_, err = client.OperatorV1().ClusterCSIDrivers().Update(ctx, ccd, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update clustercsidriver %q: %w", ClusterCSIDriverName, err)
+	}
+	return nil
 }

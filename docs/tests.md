@@ -174,6 +174,35 @@
 | [OBS-02](tests/OBS-02.md) | TagOperationsTotal tracks detach operations | vmware-vsphere-csi-driver-operator | csi-op#348 |
 | [OBS-03](tests/OBS-03.md) | TagOperationsTotal tracks PV-blocked skips | vmware-vsphere-csi-driver-operator | csi-op#348 |
 
+## CSI Topology Configuration (`csi_topology_config_test.go`) [readonly/mutating, csi-operator, csi-topology, p1]
+
+| Test ID | Description | Component | PR/Issue |
+|---|---|---|---|
+| [TOPO-01](tests/TOPO-01.md) | CSI config secret `topology-categories` matches discovered CSI topology keys | vmware-vsphere-csi-driver-operator | |
+| [TOPO-02](tests/TOPO-02.md) | `csi-provisioner` container has `--feature-gates=Topology=true` and `--strict-topology` | vmware-vsphere-csi-driver-operator | |
+| [TOPO-03](tests/TOPO-03.md) | Internal feature states ConfigMap has `improved-volume-topology` = `"true"` | vmware-vsphere-csi-driver-operator | |
+| [TOPO-04](tests/TOPO-04.md) | CSINode topology keys match discovered categories | vmware-vsphere-csi-driver-operator | |
+| [TOPO-05](tests/TOPO-05.md) | `vsphere_topology_tags` metric baseline: `infrastructure`=2, `clustercsidriver`=0 | vmware-vsphere-csi-driver-operator | |
+| [TOPO-06](tests/TOPO-06.md) | ClusterCSIDriver `topologyCategories` updates metric without overriding Infrastructure precedence (`mutating`) | vmware-vsphere-csi-driver-operator | |
+
+## CSI Synthetic Orphan Tags (`csi_orphan_tag_test.go`) [mutating, csi-operator, csi-orphan, p0/p1]
+
+> Requires `E2E_LAB_CONFIG` with `orphanTest.datastore` set (or an auto-discoverable
+> non-FD datastore), and requires `make apply-lab` to have run so the cluster tag/category
+> exist on the second vCenter. Scoped to the second vCenter only.
+
+| Test ID | Description | Component | PR/Issue |
+|---|---|---|---|
+| [SYNTH-01](tests/SYNTH-01.md) | Synthetic orphan tag detected and detached without PVs | vmware-vsphere-csi-driver-operator | |
+| [SYNTH-02](tests/SYNTH-02.md) | Orphan cleanup latency within `OperatorSyncTimeout` | vmware-vsphere-csi-driver-operator | |
+| [SYNTH-04](tests/SYNTH-04.md) | `OrphanTagsDetectedTotal` metric increments | vmware-vsphere-csi-driver-operator | |
+| [SYNTH-05](tests/SYNTH-05.md) | `TagOperationsTotal` detach/success metric increments | vmware-vsphere-csi-driver-operator | |
+| [SYNTH-09](tests/SYNTH-09.md) | Orphan cleanup causes no side-effect damage (operator healthy, StorageClass intact) | vmware-vsphere-csi-driver-operator | |
+| [SYNTH-10](tests/SYNTH-10.md) | Operator handles repeated orphans without getting stuck | vmware-vsphere-csi-driver-operator | |
+
+PV-blocked synthetic orphan tests (SYNTH-06/07/08) and the equivalent metric
+test (OBS-03 analog) are deferred — see `plans/new-csi-operator-test-topology-config.md`.
+
 ## PR Reference
 
 | Short Name | Full Reference | JIRA | Title |

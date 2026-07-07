@@ -50,6 +50,15 @@ const (
 	ForceOrphanCleanupAnnotation  = "csi.vsphere.vmware.com/force-orphan-cleanup"
 	TagOperationsMetric           = "vsphere_csi_tag_operations_total"
 	OrphanTagsDetectedMetric      = "vsphere_csi_orphan_tags_detected_total"
+
+	// CSI topology configuration constants (csi_topology_config_test.go)
+	CSIControllerDeployment = "vmware-vsphere-csi-driver-controller"
+	CSIProvisionerContainer = "csi-provisioner"
+	FeatureStatesConfigMap  = "internal-feature-states.csi.vsphere.vmware.com"
+	TopologyTagsMetric      = "vsphere_topology_tags"
+	TopologyTagsSourceInfra = "infrastructure"
+	TopologyTagsSourceCCD   = "clustercsidriver"
+
 DefaultTimeout = 5 * time.Minute
 	DefaultPolling = 10 * time.Second
 	ShortTimeout   = 30 * time.Second

@@ -8,6 +8,9 @@
 | `make test-p0` | P0 readonly subset | Same as readonly | No |
 | `make test-mutating` | 5 specs | Same + backup/restore permission | Yes (reverts) |
 | `make test-real` | 7 specs | Same + `config/lab.yaml` with real second vCenter already applied | Reads only |
+| `make test-csi-operator` | CSI FD lifecycle + topology + orphan specs | Same + `config/lab.yaml` with `failureDomain` | Yes (reverts) |
+| `make test-csi-topology` | 6 specs (TOPO-01–06) | KUBECONFIG, gate enabled, 2+ vCenters/FDs | Yes — TOPO-06 only (reverts) |
+| `make test-csi-orphan` | 6 specs (SYNTH-01/02/04/05/09/10) | Same + `config/lab.yaml`, `make apply-lab` already run | Yes (reverts) |
 | `make day2-lab` | apply → test-real → restore | Same + `config/lab.yaml` + second vCenter reachable | Yes (reverts) |
 
 ## Remote Execution
@@ -99,6 +102,21 @@ Require `openshift-config-managed/kube-cloud-config` and `openshift-cloud-contro
 ### ConfigMap Recreation (mutating)
 
 Deletes `openshift-config-managed/kube-cloud-config` and waits for `config-operator` to recreate it. Requires cluster-admin and gate enabled.
+
+### CSI Topology Configuration Tests
+
+| Test | Requires |
+|---|---|
+| TOPO-01–05 (readonly) | Gate enabled, 2+ vCenters/FDs so CSI topology categories are configured (`requireCSITopologyKeys()` skips otherwise) |
+| TOPO-06 (mutating) | Same — patches and restores `ClusterCSIDriver` `spec.driverConfig.vSphere.topologyCategories` |
+
+### CSI Synthetic Orphan Tag Tests
+
+| Test | Requires |
+|---|---|
+| SYNTH-01/02/04/05/09/10 | `config/lab.yaml` with `failureDomain` set; `make apply-lab` already run so the cluster tag/category exist on the second vCenter; a non-FD datastore on the second vCenter — set `orphanTest.datastore` explicitly, or rely on auto-discovery via `FindNonFDDatastore` (Skips if none found) |
+
+PV-blocked orphan tests (SYNTH-06/07/08) are deferred pending a MachineSet-on-local-disk-host lab checklist — see `plans/new-csi-operator-test-topology-config.md`.
 
 ### Real vCenter Tests
 

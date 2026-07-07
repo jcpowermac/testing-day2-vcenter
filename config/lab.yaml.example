@@ -25,3 +25,12 @@ failureDomain:
     networks:
       - VM Network
     resourcePool: /DC2/host/cluster1/Resources
+
+# Optional. Pins the datastore used by synthetic orphan tag tests
+# (test-csi-orphan) to a specific non-failure-domain datastore on
+# secondVCenter — typically an ESXi host's local-disk datastore.
+# Requires `make apply-lab` to have run so the cluster tag/category exist
+# on secondVCenter. If omitted, tests attempt auto-discovery via
+# FindNonFDDatastore and Skip if no suitable datastore is found.
+# orphanTest:
+#   datastore: /DC2/datastore/esxi01-local

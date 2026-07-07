@@ -1,4 +1,4 @@
-.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-real test-e2e apply-lab restore-lab verify-lab
+.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-csi-topology test-csi-orphan test-real test-e2e apply-lab restore-lab verify-lab
 
 GINKGO ?= $(shell go env GOPATH)/bin/ginkgo
 GINKGO_FLAGS ?= -v
@@ -55,6 +55,22 @@ test-csi-operator:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
 	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-operator.xml --label-filter="csi-operator" ./test/e2e/
+
+# Readonly + baseline mutating check of ClusterCSIDriver topologyCategories precedence.
+# Does not require E2E_LAB_CONFIG (TOPO-01–05 are readonly, TOPO-06 only needs cluster access).
+test-csi-topology:
+	@mkdir -p $(REPORT_DIR)
+	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-topology.xml --label-filter="csi-topology" ./test/e2e/
+
+# Synthetic orphan tag tests: attach the cluster tag to a non-FD datastore and
+# verify the operator detects and cleans it up. Requires E2E_LAB_CONFIG with
+# orphanTest.datastore set (or a discoverable non-FD datastore), and requires
+# `make apply-lab` to have run first so the cluster tag/category exist on
+# secondVCenter.
+test-csi-orphan:
+	@mkdir -p $(REPORT_DIR)
+	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-orphan.xml --label-filter="csi-orphan" ./test/e2e/
 
 test-real:
 	@mkdir -p $(REPORT_DIR)

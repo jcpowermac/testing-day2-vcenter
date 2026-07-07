@@ -13,6 +13,8 @@ make test-mutating        # run mutating tests (changes cluster state, restores 
 make test-storage         # run storage provisioning tests (needs lab config)
 make test-storage-readonly # storage tests that don't provision PVCs
 make test-csi-operator    # run CSI operator FD lifecycle tests (needs lab config)
+make test-csi-topology    # run CSI ClusterCSIDriver topology config tests (TOPO-01–06, no lab config needed)
+make test-csi-orphan      # run CSI synthetic orphan tag tests (SYNTH-*, needs lab config + apply-lab already run)
 make test-real            # run tests requiring a real second vCenter (needs config/lab.yaml)
 make test-e2e             # full end-to-end: baseline → apply → verify → all tests → restore
 make apply-lab            # add second vCenter to cluster using lab config
@@ -64,6 +66,8 @@ test/e2e/               Ginkgo e2e test suites
   topology_lifecycle_test.go          Mutating lifecycle tests
   csi_storage_test.go                 CSI storage provisioning tests
   csi_operator_lifecycle_test.go      CSI operator FD lifecycle tests (tag/SPBM/PV-safety)
+  csi_topology_config_test.go         ClusterCSIDriver topology config + precedence tests (TOPO-*)
+  csi_orphan_tag_test.go              Synthetic orphan tag tests via direct datastore tagging (SYNTH-*)
   real_vcenter_test.go                Tests requiring real second vCenter
   problem_detector_test.go            vsphere-problem-detector tests (stub)
 config/lab.yaml.example Lab config template
@@ -87,7 +91,9 @@ plans/                  Test plan documents
 - `admission` — ValidatingAdmissionPolicy tests
 - `config` — cloud config content tests
 - `operator` — ClusterOperator health tests
-- `csi-operator` — CSI operator FD lifecycle tests (tag cleanup, SPBM, PV safety)
+- `csi-operator` — CSI operator FD lifecycle tests (tag cleanup, SPBM, PV safety); also covers `csi-topology` and `csi-orphan`
+- `csi-topology` — ClusterCSIDriver topology config + Infrastructure precedence tests (TOPO-*)
+- `csi-orphan` — synthetic orphan tag tests via direct datastore tagging, second vCenter only (SYNTH-*)
 - `real-vcenter` — requires lab config with real second vCenter
 
 ## Known Issues
@@ -103,3 +109,5 @@ The cloud config `nodes` section uses camelCase YAML keys (`externalNetworkSubne
 - The ClusterOperator is named `config-operator`, NOT `cluster-config-operator`.
 - `ReplaceInfrastructureSpec` uses JSON merge patch — arrays are replaced entirely, not merged element-wise. When the VAP diffs old vs new, it sees the full array replacement.
 - `expectPatchRejected` accepts either xValidation or VAP error messages via `SatisfyAny`, since both admission layers can reject the same bad spec.
+- The CSI operator's `findOrphanedTags()` treats any tagged, non-FD `datacenter/datastore` pair as an orphan regardless of how the tag got there — this is exploited by `csi_orphan_tag_test.go` to test orphan cleanup by directly tagging a local-disk datastore via govmomi, without touching the VAP-guarded Infrastructure spec.
+- CSI cloud config `[Labels]` section uses key `topology-categories` (comma-separated category names), not the legacy `region`/`zone` keys — see `framework.CSIConfigTopologyCategories`.

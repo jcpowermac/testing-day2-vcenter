@@ -21,6 +21,20 @@ type LabConfig struct {
 
 	// FailureDomain is optional. When set, a failure domain is added pointing at secondVCenter.
 	FailureDomain *FailureDomainConfig `yaml:"failureDomain,omitempty"`
+
+	// OrphanTest is optional. When set, it pins the datastore used by the
+	// synthetic orphan tag tests (csi_orphan_tag_test.go) to a specific
+	// non-failure-domain datastore on secondVCenter, instead of relying on
+	// auto-discovery via FindNonFDDatastore.
+	OrphanTest *OrphanTestConfig `yaml:"orphanTest,omitempty"`
+}
+
+// OrphanTestConfig pins the datastore used by synthetic orphan tag tests.
+type OrphanTestConfig struct {
+	// Datastore is the absolute inventory path of a datastore on secondVCenter
+	// that is NOT referenced by any Infrastructure failure domain, e.g.
+	// "/wldn-120-DC/datastore/wldn-120-esxi01-local".
+	Datastore string `yaml:"datastore"`
 }
 
 // VCenterConfig is connection info for one vCenter.
