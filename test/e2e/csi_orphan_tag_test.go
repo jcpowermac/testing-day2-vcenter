@@ -174,7 +174,7 @@ var _ = Describe("CSI Synthetic Orphan Tags", Serial, Ordered, Label("csi-operat
 		GinkgoWriter.Println("SYNTH-09: PASS")
 	})
 
-	It("SYNTH-10: operator handles repeated orphans without getting stuck", Label("p1"), func() {
+	It("SYNTH-10: operator handles repeated orphans without getting stuck", Label("p1"), NodeTimeout(25*time.Minute), func() {
 		GinkgoWriter.Println("  first attach/detach cycle")
 		Expect(vsphere.AttachTagToDatastore(suiteCtx, orphanSess, orphanDatastore, orphanTagName)).To(Succeed())
 		DeferCleanup(func() {
