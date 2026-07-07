@@ -34,6 +34,7 @@ const (
 	CSIDriverNodeLabel       = "app=vmware-vsphere-csi-driver-node"
 	CSICredentialSecretName  = "vmware-vsphere-cloud-credentials"
 	CSITopologyKeyPrefix = "topology.csi.vmware.com/"
+	CSIDriverConfigSecretName = "vsphere-csi-config-secret"
 	ClusterCSIDriverName     = "csi.vsphere.vmware.com"
 	StorageOperatorName      = "storage"
 

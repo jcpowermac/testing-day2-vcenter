@@ -439,22 +439,19 @@ func WaitForClusterCSIDriverAvailable(ctx context.Context, client operatorclient
 }
 
 // GetCSIDriverConfig reads the CSI driver cloud config from the operator namespace.
+// The operator writes this as Secret "vsphere-csi-config-secret" with key "cloud.conf".
 func GetCSIDriverConfig(ctx context.Context, client kubernetes.Interface) (string, error) {
-	cm, err := client.CoreV1().ConfigMaps(CSIDriverNamespace).Get(ctx, "vmware-vsphere-csi-driver-config", metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(CSIDriverNamespace).Get(ctx, CSIDriverConfigSecretName, metav1.GetOptions{})
 	if err != nil {
-		secret, sErr := client.CoreV1().Secrets(CSIDriverNamespace).Get(ctx, "vmware-vsphere-cloud-provider-config", metav1.GetOptions{})
-		if sErr != nil {
-			return "", fmt.Errorf("CSI driver config not found as ConfigMap or Secret: %v / %v", err, sErr)
-		}
-		for _, v := range secret.Data {
-			return string(v), nil
-		}
-		return "", fmt.Errorf("CSI driver config Secret has no data")
+		return "", fmt.Errorf("CSI driver config Secret %s/%s not found: %v",
+			CSIDriverNamespace, CSIDriverConfigSecretName, err)
 	}
-	for _, v := range cm.Data {
-		return v, nil
+	data, ok := secret.Data[CloudConfigDataKey]
+	if !ok || len(data) == 0 {
+		return "", fmt.Errorf("CSI driver config Secret %s/%s has no %q key",
+			CSIDriverNamespace, CSIDriverConfigSecretName, CloudConfigDataKey)
 	}
-	return "", fmt.Errorf("CSI driver config ConfigMap has no data")
+	return string(data), nil
 }
 
 // CSIConfigHasVCenter checks if a cloud config string references a vCenter hostname.
