@@ -174,19 +174,19 @@ var _ = Describe("CSI Synthetic Orphan Tags", Serial, Ordered, Label("csi-operat
 		GinkgoWriter.Println("SYNTH-09: PASS")
 	})
 
-	It("SYNTH-10: operator handles repeated orphans without getting stuck", Label("p1"), NodeTimeout(25*time.Minute), func() {
+	It("SYNTH-10: operator handles repeated orphans without getting stuck", Label("p1"), NodeTimeout(25*time.Minute), func(ctx SpecContext) {
 		GinkgoWriter.Println("  first attach/detach cycle")
-		Expect(vsphere.AttachTagToDatastore(suiteCtx, orphanSess, orphanDatastore, orphanTagName)).To(Succeed())
+		Expect(vsphere.AttachTagToDatastore(ctx, orphanSess, orphanDatastore, orphanTagName)).To(Succeed())
 		DeferCleanup(func() {
 			_ = vsphere.DetachTagFromDatastore(suiteCtx, orphanSess, orphanDatastore, orphanTagName)
 		})
-		waitForTagDetached(suiteCtx, orphanSess, orphanDatastore, orphanTagName, framework.OperatorSyncTimeout)
+		waitForTagDetached(ctx, orphanSess, orphanDatastore, orphanTagName, framework.OperatorSyncTimeout)
 
 		GinkgoWriter.Println("  second attach/detach cycle")
-		Expect(vsphere.AttachTagToDatastore(suiteCtx, orphanSess, orphanDatastore, orphanTagName)).To(Succeed())
+		Expect(vsphere.AttachTagToDatastore(ctx, orphanSess, orphanDatastore, orphanTagName)).To(Succeed())
 
 		start := time.Now()
-		waitForTagDetached(suiteCtx, orphanSess, orphanDatastore, orphanTagName, framework.OperatorSyncTimeout)
+		waitForTagDetached(ctx, orphanSess, orphanDatastore, orphanTagName, framework.OperatorSyncTimeout)
 		elapsed := time.Since(start)
 		GinkgoWriter.Printf("SYNTH-10: second detach completed in %v\n", elapsed)
 		Expect(elapsed).To(BeNumerically("<", framework.OperatorSyncTimeout),
