@@ -53,9 +53,9 @@ type Result int
 
 const (
 	ResultMissing Result = iota
+	ResultSkip
 	ResultPass
 	ResultFail
-	ResultSkip
 	ResultError
 )
 
