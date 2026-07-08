@@ -197,7 +197,7 @@ var (
 	csiOpTestNS        []string
 )
 
-var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label("csi-operator", "mutating"), func() {
+var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label("csi-operator", "multi-vcenter", "mutating"), func() {
 
 	BeforeEach(func() {
 		requireGateEnabled()

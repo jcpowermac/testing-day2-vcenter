@@ -26,7 +26,7 @@ func csiOperatorMetrics() (string, error) {
 		framework.CSIDriverNamespace, "name=vmware-vsphere-csi-driver-operator")
 }
 
-var _ = Describe("CSI topology configuration", Label("csi-operator", "csi-topology", "readonly"), func() {
+var _ = Describe("CSI topology configuration", Label("csi-operator", "csi-topology", "multi-vcenter", "readonly"), func() {
 
 	BeforeEach(func() {
 		requireGateEnabled()
@@ -99,7 +99,7 @@ var _ = Describe("CSI topology configuration", Label("csi-operator", "csi-topolo
 	})
 })
 
-var _ = Describe("CSI topology configuration precedence", Serial, Ordered, Label("csi-operator", "csi-topology", "mutating"), func() {
+var _ = Describe("CSI topology configuration precedence", Serial, Ordered, Label("csi-operator", "csi-topology", "multi-vcenter", "mutating"), func() {
 
 	BeforeEach(func() {
 		requireGateEnabled()

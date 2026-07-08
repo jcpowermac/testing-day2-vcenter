@@ -32,7 +32,7 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			}
 		})
 
-		It("should deny removing a failure domain referenced by a Machine (N-SEQ-01)", Label("mutating"), func() {
+		It("should deny removing a failure domain referenced by a Machine (N-SEQ-01)", Label("mutating", "multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			region, zone, ok := findMachineBackedFailureDomain(infra)
@@ -42,7 +42,7 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			expectFailureDomainRemovalDenied(infra, region, zone)
 		})
 
-		It("should deny removing a failure domain referenced by a CPMS (N-SEQ-02)", Label("mutating"), func() {
+		It("should deny removing a failure domain referenced by a CPMS (N-SEQ-02)", Label("mutating", "multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			region, zone, ok := findCPMSBackedFailureDomain(infra)
@@ -52,7 +52,7 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			expectFailureDomainRemovalDenied(infra, region, zone)
 		})
 
-		It("should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)", Label("mutating"), func() {
+		It("should deny removing a failure domain referenced by a MachineSet (N-SEQ-03)", Label("mutating", "multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)
@@ -87,7 +87,7 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			expectFailureDomainRemovalDenied(infra, fd.Region, fd.Zone)
 		})
 
-		It("should allow removing an unreferenced failure domain via dry-run", func() {
+		It("should allow removing an unreferenced failure domain via dry-run", Label("multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			fds := framework.GetFailureDomains(infra)

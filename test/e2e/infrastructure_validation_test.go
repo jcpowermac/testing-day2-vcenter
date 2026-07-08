@@ -34,13 +34,13 @@ var _ = Describe("Infrastructure xValidation", Label("readonly", "validation", "
 			expectRawPatchRejected(patch, "vcenters")
 		})
 
-		It("should reject swapping an existing vCenter server (N-INF-05)", func() {
+		It("should reject swapping an existing vCenter server (N-INF-05)", Label("multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			expectPatchRejected(swapSecondVCenterServer(infra, "vcenter-swapped.example.com"), "Cannot add and remove vCenters at the same time")
 		})
 
-		It("should reject simultaneous add and remove of vCenters (N-INF-06/07)", func() {
+		It("should reject simultaneous add and remove of vCenters (N-INF-06/07)", Label("multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			expectPatchRejected(addAndRemoveVCenterSamePatch(infra), "Cannot add and remove vCenters at the same time")
@@ -51,7 +51,7 @@ var _ = Describe("Infrastructure xValidation", Label("readonly", "validation", "
 			expectPatchRejected(tooManyVCentersSpec(infra), "must have at most 3 items")
 		})
 
-		It("should reject removing a vCenter still referenced by a failure domain (N-INF-12)", func() {
+		It("should reject removing a vCenter still referenced by a failure domain (N-INF-12)", Label("multi-vcenter"), func() {
 			requireMultiVCenter()
 			infra := currentInfrastructure()
 			spec := fdReferencingRemovedVCenterSpec(infra)

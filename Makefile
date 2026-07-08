@@ -83,7 +83,7 @@ test-e2e:
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
 	@mkdir -p $(REPORT_DIR)
 	@echo "=== Phase 1: baseline readonly (single-vCenter) ==="
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase1-readonly.xml --label-filter="readonly" ./test/e2e/
+	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase1-readonly.xml --label-filter="readonly && !multi-vcenter" ./test/e2e/
 	@echo "=== Phase 2: apply second vCenter ==="
 	go run ./cmd/day2-vcenter apply -config $(CONFIG)
 	@echo "=== Phase 2b: verify cluster readiness ==="

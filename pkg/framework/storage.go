@@ -559,3 +559,46 @@ func SetClusterCSIDriverTopologyCategories(ctx context.Context, client operatorc
 	}
 	return nil
 }
+
+// WaitForCSIDriverPodsReady waits until all CSI driver controller and node pods
+// are in Running phase with no excessive restarts.
+func WaitForCSIDriverPodsReady(ctx context.Context, client kubernetes.Interface, timeout time.Duration) error {
+	var lastErr error
+	lastLog := time.Now()
+	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		controllerPods, err := ListPodsByLabel(ctx, client, CSIDriverNamespace, CSIDriverControllerLabel)
+		if err != nil {
+			lastErr = fmt.Errorf("list CSI controller pods: %w", err)
+			return false, nil
+		}
+		if len(controllerPods) == 0 {
+			lastErr = fmt.Errorf("no CSI controller pods found")
+			return false, nil
+		}
+
+		nodePods, err := ListPodsByLabel(ctx, client, CSIDriverNamespace, CSIDriverNodeLabel)
+		if err != nil {
+			lastErr = fmt.Errorf("list CSI node pods: %w", err)
+			return false, nil
+		}
+
+		allPods := append(controllerPods, nodePods...)
+		for i := range allPods {
+			pod := &allPods[i]
+			if pod.Status.Phase != corev1.PodRunning {
+				lastErr = fmt.Errorf("CSI pod %s phase=%s", pod.Name, pod.Status.Phase)
+				if time.Since(lastLog) >= 30*time.Second {
+					fmt.Printf("  wait: CSI pod %s phase=%s\n", pod.Name, pod.Status.Phase)
+					lastLog = time.Now()
+				}
+				return false, nil
+			}
+		}
+		lastErr = nil
+		return true, nil
+	})
+	if pollErr != nil && lastErr != nil {
+		return fmt.Errorf("%w: last error: %v", pollErr, lastErr)
+	}
+	return pollErr
+}

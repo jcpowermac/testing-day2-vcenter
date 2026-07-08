@@ -280,6 +280,16 @@ func waitForClusterReady(ctx context.Context, clients *framework.Clients) error 
 		}
 		fmt.Printf("operator %s is stable\n", name)
 	}
+	fmt.Println("waiting for ClusterCSIDriver to be available and not degraded...")
+	if err := framework.WaitForClusterCSIDriverAvailable(ctx, clients.Operator, framework.ClusterCSIDriverName, framework.LongTimeout); err != nil {
+		return fmt.Errorf("ClusterCSIDriver not ready: %w", err)
+	}
+	fmt.Println("ClusterCSIDriver is available")
+	fmt.Println("waiting for CSI driver pods to be Running...")
+	if err := framework.WaitForCSIDriverPodsReady(ctx, clients.Kube, framework.LongTimeout); err != nil {
+		return fmt.Errorf("CSI driver pods not ready: %w", err)
+	}
+	fmt.Println("all CSI driver pods Running")
 	fmt.Println("waiting for all Machines to be Running...")
 	if err := framework.WaitForAllMachinesHealthy(ctx, clients.Machine, framework.LongTimeout); err != nil {
 		return fmt.Errorf("machines not ready: %w", err)

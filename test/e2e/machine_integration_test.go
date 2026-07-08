@@ -27,7 +27,7 @@ var _ = Describe("Machine integration", Label("readonly", "integration", "p0"), 
 		}
 	})
 
-	It("should label every Machine with region and zone", func() {
+	It("should label every Machine with region and zone", Label("multi-vcenter"), func() {
 		requireMultiVCenter()
 		machines := listMachines()
 		for _, m := range machines {
@@ -41,7 +41,7 @@ var _ = Describe("Machine integration", Label("readonly", "integration", "p0"), 
 		}
 	})
 
-	It("should map every Machine to a valid Infrastructure failure domain", func() {
+	It("should map every Machine to a valid Infrastructure failure domain", Label("multi-vcenter"), func() {
 		requireMultiVCenter()
 		infra := currentInfrastructure()
 		fds := framework.GetFailureDomains(infra)
@@ -64,7 +64,7 @@ var _ = Describe("Machine integration", Label("readonly", "integration", "p0"), 
 		}
 	})
 
-	It("should have Machine providerSpec workspace matching Infrastructure topology", func() {
+	It("should have Machine providerSpec workspace matching Infrastructure topology", Label("multi-vcenter"), func() {
 		requireMultiVCenter()
 		infra := currentInfrastructure()
 		fds := framework.GetFailureDomains(infra)

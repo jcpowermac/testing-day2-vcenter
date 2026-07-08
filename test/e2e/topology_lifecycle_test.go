@@ -8,7 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Topology lifecycle", Label("mutating", "p0"), func() {
+var _ = Describe("Topology lifecycle", Label("mutating", "multi-vcenter", "p0"), func() {
 	Context("negative dry-run prechecks", func() {
 		It("should deny removing a failure domain that still has Machines (N-SEQ-05 precheck)", func() {
 			requireGateEnabled()
