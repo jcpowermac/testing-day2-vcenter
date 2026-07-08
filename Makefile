@@ -45,7 +45,7 @@ test-mutating:
 
 test-storage:
 	@mkdir -p $(REPORT_DIR)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=storage.xml --label-filter="storage" ./test/e2e/
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=storage.xml --label-filter="storage" ./test/e2e/
 
 test-storage-readonly:
 	@mkdir -p $(REPORT_DIR)
@@ -54,7 +54,7 @@ test-storage-readonly:
 test-csi-operator:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-operator.xml --label-filter="csi-operator" ./test/e2e/
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=csi-operator.xml --label-filter="csi-operator" ./test/e2e/
 
 # Readonly + baseline mutating check of ClusterCSIDriver topologyCategories precedence.
 # Does not require E2E_LAB_CONFIG (TOPO-01–05 are readonly, TOPO-06 only needs cluster access).
@@ -75,7 +75,7 @@ test-csi-orphan:
 test-real:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=real-vcenter.xml --label-filter="real-vcenter" ./test/e2e/
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=real-vcenter.xml --label-filter="real-vcenter" ./test/e2e/
 
 # Full end-to-end: baseline → apply → all tests → restore
 # Restore always runs after apply, even if tests fail.
@@ -94,7 +94,7 @@ test-e2e:
 	echo "=== Phase 4: mutating ==="; \
 	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase4-mutating.xml --label-filter="mutating" ./test/e2e/ || rc=$$?; \
 	echo "=== Phase 5: storage ==="; \
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase5-storage.xml --label-filter="storage" ./test/e2e/ || rc=$$?; \
+	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=phase5-storage.xml --label-filter="storage" ./test/e2e/ || rc=$$?; \
 	echo "=== Phase 6: restore ==="; \
 	go run ./cmd/day2-vcenter restore -config $(CONFIG); \
 	exit $$rc

@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
 	"github.com/jcallen/testing-day2-vcenter/pkg/labconfig"
@@ -214,7 +215,7 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		testNamespaces []string
 	)
 
-	BeforeAll(func() {
+	BeforeAll(NodeTimeout(20*time.Minute), func() {
 		lab = requireLabConfigWithFD()
 		requireGateEnabled()
 		topoKeys = requireCSITopologyKeys()
@@ -289,7 +290,7 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			lab.FailureDomain.Region, lab.FailureDomain.Zone)
 	})
 
-	AfterAll(func() {
+	AfterAll(NodeTimeout(20*time.Minute), func() {
 		for _, ns := range testNamespaces {
 			GinkgoWriter.Printf("deleting test namespace %s before MachineSet teardown\n", ns)
 			err := framework.DeleteNamespace(suiteCtx, clients.Kube, ns, framework.DefaultTimeout)
