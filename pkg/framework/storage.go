@@ -400,7 +400,9 @@ func GetClusterCSIDriverCondition(ctx context.Context, client operatorclient.Int
 	return nil, fmt.Errorf("condition %q not found on clustercsidriver %q", conditionType, name)
 }
 
-// WaitForClusterCSIDriverAvailable waits until Available=True and not Degraded.
+// WaitForClusterCSIDriverAvailable waits until all *Available conditions are
+// True and all *Degraded conditions are False. ClusterCSIDriver conditions are
+// prefixed (e.g. "VMwareVSphereControllerDegraded"), not bare "Available"/"Degraded".
 func WaitForClusterCSIDriverAvailable(ctx context.Context, client operatorclient.Interface, name string, timeout time.Duration) error {
 	var lastErr error
 	lastLog := time.Now()
@@ -415,23 +417,44 @@ func WaitForClusterCSIDriverAvailable(ctx context.Context, client operatorclient
 			return false, nil
 		}
 
-		var availableOK, degradedOK bool
+		anyAvailable := false
+		allAvailable := true
+		allNotDegraded := true
+		var degradedNames []string
+		var unavailableNames []string
 		for i := range csi.Status.Conditions {
-			switch csi.Status.Conditions[i].Type {
-			case "Available":
-				availableOK = csi.Status.Conditions[i].Status == operatorv1.ConditionTrue
-			case "Degraded":
-				degradedOK = csi.Status.Conditions[i].Status == operatorv1.ConditionFalse
+			c := &csi.Status.Conditions[i]
+			if strings.HasSuffix(c.Type, "Available") {
+				anyAvailable = true
+				if c.Status != operatorv1.ConditionTrue {
+					allAvailable = false
+					unavailableNames = append(unavailableNames, c.Type)
+				}
+			}
+			if strings.HasSuffix(c.Type, "Degraded") {
+				if c.Status != operatorv1.ConditionFalse {
+					allNotDegraded = false
+					degradedNames = append(degradedNames, c.Type)
+				}
 			}
 		}
-		if !availableOK || !degradedOK {
+		ready := anyAvailable && allAvailable && allNotDegraded
+		if !ready {
 			if time.Since(lastLog) >= 30*time.Second {
-				fmt.Printf("  wait: CSI driver %s: Available=%v Degraded=%v\n", name, availableOK, !degradedOK)
+				if len(unavailableNames) > 0 {
+					fmt.Printf("  wait: CSI driver %s: not available: %s\n", name, strings.Join(unavailableNames, ", "))
+				}
+				if len(degradedNames) > 0 {
+					fmt.Printf("  wait: CSI driver %s: degraded: %s\n", name, strings.Join(degradedNames, ", "))
+				}
+				if !anyAvailable {
+					fmt.Printf("  wait: CSI driver %s: no Available conditions found\n", name)
+				}
 				lastLog = time.Now()
 			}
 		}
 		lastErr = nil
-		return availableOK && degradedOK, nil
+		return ready, nil
 	})
 	if pollErr != nil && lastErr != nil {
 		return fmt.Errorf("%w: last error: %v", pollErr, lastErr)
