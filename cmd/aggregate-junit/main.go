@@ -77,15 +77,15 @@ func (r Result) String() string {
 func (r Result) Emoji() string {
 	switch r {
 	case ResultPass:
-		return "&#x2705;"
+		return "✅"
 	case ResultFail:
-		return "&#x274C;"
+		return "❌"
 	case ResultSkip:
-		return "&#x23ED;"
+		return "⏭"
 	case ResultError:
-		return "&#x26A0;"
+		return "⚠"
 	default:
-		return "&#x2796;"
+		return "➖"
 	}
 }
 
