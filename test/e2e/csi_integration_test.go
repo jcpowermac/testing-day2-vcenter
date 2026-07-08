@@ -34,10 +34,14 @@ var _ = Describe("CSI driver integration", Label("readonly", "integration", "p1"
 		if err != nil || len(pods) == 0 {
 			Skip("vSphere CSI driver controller pods not found")
 		}
-		for _, pod := range pods {
-			Expect(string(pod.Status.Phase)).To(Equal("Running"),
-				"CSI driver pod %s phase is %s, expected Running", pod.Name, pod.Status.Phase)
-		}
+		Eventually(func(g Gomega) {
+			pods, err := framework.ListPodsByLabel(suiteCtx, clients.Kube, "openshift-cluster-csi-drivers", "app=vmware-vsphere-csi-driver-controller")
+			g.Expect(err).NotTo(HaveOccurred())
+			for _, pod := range pods {
+				g.Expect(string(pod.Status.Phase)).To(Equal("Running"),
+					"CSI driver pod %s phase is %s, expected Running", pod.Name, pod.Status.Phase)
+			}
+		}).WithTimeout(framework.DefaultTimeout).WithPolling(framework.DefaultPolling).Should(Succeed())
 	})
 
 	It("should have managed cloud config listing all vCenter datacenters for CSI", func() {
