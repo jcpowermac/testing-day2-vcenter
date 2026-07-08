@@ -29,38 +29,38 @@ verify-lab:
 	go run ./cmd/day2-vcenter verify -config $(CONFIG)
 
 test-dry-run:
-	$(GINKGO) $(GINKGO_FLAGS) --dry-run ./test/e2e/
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) --dry-run ./test/e2e/
 
 test-readonly:
 	@mkdir -p $(REPORT_DIR)
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=readonly.xml --label-filter="readonly" ./test/e2e/
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=readonly.xml --label-filter="readonly" ./test/e2e/
 
 test-p0:
 	@mkdir -p $(REPORT_DIR)
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=p0.xml --label-filter="p0 && readonly" ./test/e2e/
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=p0.xml --label-filter="p0 && readonly" ./test/e2e/
 
 test-mutating:
 	@mkdir -p $(REPORT_DIR)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=mutating.xml --label-filter="mutating" ./test/e2e/
+	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=mutating.xml --label-filter="mutating" ./test/e2e/
 
 test-storage:
 	@mkdir -p $(REPORT_DIR)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=storage.xml --label-filter="storage" ./test/e2e/
+	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=storage.xml --label-filter="storage" ./test/e2e/
 
 test-storage-readonly:
 	@mkdir -p $(REPORT_DIR)
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=storage-readonly.xml --label-filter="storage && readonly" ./test/e2e/
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=storage-readonly.xml --label-filter="storage && readonly" ./test/e2e/
 
 test-csi-operator:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=csi-operator.xml --label-filter="csi-operator" ./test/e2e/
+	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=csi-operator.xml --label-filter="csi-operator" ./test/e2e/
 
 # Readonly + baseline mutating check of ClusterCSIDriver topologyCategories precedence.
 # Does not require E2E_LAB_CONFIG (TOPO-01–05 are readonly, TOPO-06 only needs cluster access).
 test-csi-topology:
 	@mkdir -p $(REPORT_DIR)
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-topology.xml --label-filter="csi-topology" ./test/e2e/
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-topology.xml --label-filter="csi-topology" ./test/e2e/
 
 # Synthetic orphan tag tests: attach the cluster tag to a non-FD datastore and
 # verify the operator detects and cleans it up. Requires E2E_LAB_CONFIG with
@@ -70,33 +70,46 @@ test-csi-topology:
 test-csi-orphan:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-orphan.xml --label-filter="csi-orphan" ./test/e2e/
+	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-orphan.xml --label-filter="csi-orphan" ./test/e2e/
 
 test-real:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=real-vcenter.xml --label-filter="real-vcenter" ./test/e2e/
+	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=real-vcenter.xml --label-filter="real-vcenter" ./test/e2e/
 
 # Full end-to-end: baseline → apply → all tests → restore
 # Restore always runs after apply, even if tests fail.
 test-e2e:
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
 	@mkdir -p $(REPORT_DIR)
-	@echo "=== Phase 1: baseline readonly (single-vCenter) ==="
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase1-readonly.xml --label-filter="readonly && !multi-vcenter" ./test/e2e/
-	@echo "=== Phase 2: apply second vCenter ==="
-	go run ./cmd/day2-vcenter apply -config $(CONFIG)
-	@echo "=== Phase 2b: verify cluster readiness ==="
-	go run ./cmd/day2-vcenter verify -config $(CONFIG)
-	@rc=0; \
-	echo "=== Phase 3: readonly (multi-vCenter) ==="; \
-	$(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase3-readonly.xml --label-filter="readonly" ./test/e2e/ || rc=$$?; \
-	echo "=== Phase 4: mutating ==="; \
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase4-mutating.xml --label-filter="mutating" ./test/e2e/ || rc=$$?; \
-	echo "=== Phase 5: storage ==="; \
-	E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=phase5-storage.xml --label-filter="storage" ./test/e2e/ || rc=$$?; \
-	echo "=== Phase 6: restore ==="; \
-	go run ./cmd/day2-vcenter restore -config $(CONFIG); \
+	@rc=0; restore_needed=0; \
+	echo "=== Phase 1: baseline readonly (single-vCenter) ==="; \
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase1-readonly.xml --label-filter="readonly && !multi-vcenter" ./test/e2e/ || rc=$$?; \
+	if [ $$rc -eq 0 ]; then \
+		echo "=== Phase 2: apply second vCenter ==="; \
+		restore_needed=1; \
+		go run ./cmd/day2-vcenter apply -config $(CONFIG) || rc=$$?; \
+	fi; \
+	if [ $$rc -eq 0 ]; then \
+		echo "=== Phase 2b: verify cluster readiness ==="; \
+		go run ./cmd/day2-vcenter verify -config $(CONFIG) || rc=$$?; \
+	fi; \
+	if [ $$restore_needed -eq 1 ] && [ $$rc -eq 0 ]; then \
+		echo "=== Phase 3: readonly (multi-vCenter) ==="; \
+		RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase3-readonly.xml --label-filter="readonly" ./test/e2e/ || rc=$$?; \
+		echo "=== Phase 4: mutating ==="; \
+		RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=phase4-mutating.xml --label-filter="mutating" ./test/e2e/ || rc=$$?; \
+		echo "=== Phase 5: storage ==="; \
+		RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) --timeout=45m $(GINKGO_REPORT)=phase5-storage.xml --label-filter="storage" ./test/e2e/ || rc=$$?; \
+	fi; \
+	if [ $$restore_needed -eq 1 ]; then \
+		echo "=== Phase 6: restore ==="; \
+		go run ./cmd/day2-vcenter restore -config $(CONFIG); \
+		restore_rc=$$?; \
+		if [ $$restore_rc -ne 0 ] && [ $$rc -eq 0 ]; then \
+			rc=$$restore_rc; \
+		fi; \
+	fi; \
 	exit $$rc
 
 aggregate-junit:

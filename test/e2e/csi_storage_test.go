@@ -215,7 +215,7 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		testNamespaces []string
 	)
 
-	BeforeAll(NodeTimeout(20*time.Minute), func() {
+	BeforeAll(NodeTimeout(20*time.Minute), func(ctx SpecContext) {
 		lab = requireLabConfigWithFD()
 		requireGateEnabled()
 		topoKeys = requireCSITopologyKeys()
@@ -227,7 +227,7 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			"Infrastructure should contain failure domain region=%s zone=%s — run make apply-lab first",
 			lab.FailureDomain.Region, lab.FailureDomain.Zone)
 
-		nodes, err := clients.Kube.CoreV1().Nodes().List(suiteCtx, metav1.ListOptions{})
+		nodes, err := clients.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for _, node := range nodes.Items {
 			if node.Labels[topoKeys.Region] == lab.FailureDomain.Region &&
@@ -249,11 +249,11 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		msName = fmt.Sprintf("csi-test-%s", lab.FailureDomain.Name)
 
 		existing, err := clients.Machine.MachineV1beta1().MachineSets(framework.MachineAPINamespace).Get(
-			suiteCtx, msName, metav1.GetOptions{})
+			ctx, msName, metav1.GetOptions{})
 		if err == nil {
 			GinkgoWriter.Printf("MachineSet %s already exists (replicas=%d), reusing\n", msName, *existing.Spec.Replicas)
 			if *existing.Spec.Replicas == 0 {
-				Expect(framework.ScaleMachineSet(suiteCtx, clients.Machine, msName, 1)).To(Succeed(),
+				Expect(framework.ScaleMachineSet(ctx, clients.Machine, msName, 1)).To(Succeed(),
 					"scale up existing MachineSet %s", msName)
 			}
 			msCreated = true
@@ -261,20 +261,20 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			ms, cloneErr := framework.CloneMachineSetForFD(machineSets[0], msName, lab)
 			Expect(cloneErr).NotTo(HaveOccurred(), "clone MachineSet for FD")
 
-			_, createErr := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
+			_, createErr := framework.CreateMachineSet(ctx, clients.Machine, ms)
 			Expect(createErr).NotTo(HaveOccurred(), "create MachineSet %s", msName)
 			msCreated = true
 		}
 
 		GinkgoWriter.Printf("waiting for Machine in MachineSet %s to be Running\n", msName)
 		Eventually(func() error {
-			return framework.WaitForMachineSetMachines(suiteCtx, clients.Machine, msName, 1)
+			return framework.WaitForMachineSetMachines(ctx, clients.Machine, msName, 1)
 		}, framework.LongTimeout, framework.DefaultPolling).Should(Succeed(),
 			"Machine in new FD should reach Running/Provisioned")
 
 		GinkgoWriter.Println("waiting for new node to get CSI topology labels")
 		Eventually(func() bool {
-			nodeList, err := clients.Kube.CoreV1().Nodes().List(suiteCtx, metav1.ListOptions{})
+			nodeList, err := clients.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false
 			}
@@ -290,10 +290,10 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			lab.FailureDomain.Region, lab.FailureDomain.Zone)
 	})
 
-	AfterAll(NodeTimeout(20*time.Minute), func() {
+	AfterAll(NodeTimeout(20*time.Minute), func(ctx SpecContext) {
 		for _, ns := range testNamespaces {
 			GinkgoWriter.Printf("deleting test namespace %s before MachineSet teardown\n", ns)
-			err := framework.DeleteNamespace(suiteCtx, clients.Kube, ns, framework.DefaultTimeout)
+			err := framework.DeleteNamespace(ctx, clients.Kube, ns, framework.DefaultTimeout)
 			if err != nil {
 				GinkgoWriter.Printf("namespace %s deletion failed: %v\n", ns, err)
 			}
@@ -304,13 +304,13 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			return
 		}
 		GinkgoWriter.Printf("cleaning up MachineSet %s\n", msName)
-		_ = framework.ScaleMachineSet(suiteCtx, clients.Machine, msName, 0)
-		err := framework.WaitForMachineSetDrainedWithLog(suiteCtx, clients.Machine, msName, framework.LongTimeout)
+		_ = framework.ScaleMachineSet(ctx, clients.Machine, msName, 0)
+		err := framework.WaitForMachineSetDrainedWithLog(ctx, clients.Machine, msName, framework.LongTimeout)
 		if err != nil {
 			GinkgoWriter.Printf("MachineSet %s drain failed: %v, force-deleting remaining Machines\n", msName, err)
-			framework.ForceDeleteMachineSetMachines(suiteCtx, clients.Machine, msName)
+			framework.ForceDeleteMachineSetMachines(ctx, clients.Machine, msName)
 		}
-		_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, msName)
+		_ = framework.DeleteMachineSet(ctx, clients.Machine, msName)
 	})
 
 	It("should provision a PV in new failure domain with correct topology labels (N-CSI-05)", Label("p1"), func() {

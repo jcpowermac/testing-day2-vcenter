@@ -3,17 +3,18 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
 	"github.com/jcallen/testing-day2-vcenter/pkg/labconfig"
 	"github.com/jcallen/testing-day2-vcenter/pkg/vsphere"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -24,11 +25,14 @@ var (
 	infraBackup *configv1.Infrastructure
 	gateEnabled bool
 	labCfg      *labconfig.LabConfig
-	labCfgPath     string
-	csiTopoKeys    *framework.CSITopologyKeys
+	labCfgPath  string
+	csiTopoKeys *framework.CSITopologyKeys
 )
 
 func TestE2E(t *testing.T) {
+	if os.Getenv("RUN_E2E") != "1" {
+		t.Skip("set RUN_E2E=1 to run live cluster e2e tests")
+	}
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "vSphere Multi-vCenter Day 2 E2E Suite")
 }
@@ -77,7 +81,7 @@ var _ = AfterSuite(func() {
 	if clients == nil || infraBackup == nil {
 		return
 	}
-	_ = framework.RestoreInfrastructure(suiteCtx, clients.Config, infraBackup)
+	restoreInfrastructureOrFail(infraBackup)
 })
 
 func requireGateEnabled() {
@@ -118,6 +122,12 @@ func currentInfrastructure() *configv1.Infrastructure {
 	return infra
 }
 
+func restoreInfrastructureOrFail(backup *configv1.Infrastructure) {
+	Expect(backup).NotTo(BeNil(), "Infrastructure backup should not be nil")
+	Expect(framework.RestoreInfrastructure(suiteCtx, clients.Config, backup)).To(Succeed(),
+		"Infrastructure restore should succeed")
+}
+
 func patchInfrastructureSpec(spec *configv1.InfrastructureSpec, dryRun bool) (*configv1.Infrastructure, error) {
 	return framework.ReplaceInfrastructureSpec(suiteCtx, clients.Config, spec, dryRun)
 }
@@ -151,13 +161,12 @@ func expectPatchAllowedDryRun(spec *configv1.InfrastructureSpec) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-
 func withInfrastructureRestore(fn func(spec *configv1.InfrastructureSpec)) {
 	backup, err := framework.BackupInfrastructure(suiteCtx, clients.Config)
 	Expect(err).NotTo(HaveOccurred())
 
 	DeferCleanup(func() {
-		_ = framework.RestoreInfrastructure(suiteCtx, clients.Config, backup)
+		restoreInfrastructureOrFail(backup)
 	})
 
 	infra, err := framework.GetInfrastructure(suiteCtx, clients.Config)
@@ -224,7 +233,6 @@ func specWithoutVCenter(infra *configv1.Infrastructure, server string) *configv1
 	return &spec
 }
 
-
 func expectFailureDomainRemovalDenied(infra *configv1.Infrastructure, region, zone string) {
 	spec := specWithoutFailureDomain(infra, region, zone)
 	_, err := patchInfrastructureSpec(spec, false)
@@ -252,7 +260,6 @@ func findCPMSBackedFailureDomain(infra *configv1.Infrastructure) (region, zone s
 	return "", "", false
 }
 
-
 func managedCloudConfigYAML() string {
 	cm, err := framework.GetConfigMap(suiteCtx, clients.Kube, framework.ManagedConfigNamespace, framework.ManagedConfigName)
 	if err != nil {
@@ -276,7 +283,6 @@ func sourceCloudConfigYAML() (string, bool) {
 	}
 	return cm.Data[framework.SourceCloudConfigDataKey], true
 }
-
 
 func duplicateFirstVCenterSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
 	spec := vsphere.CloneInfrastructureSpec(infra.Spec)
@@ -317,7 +323,6 @@ func emptyVCentersSpec(infra *configv1.Infrastructure) *configv1.InfrastructureS
 	spec.PlatformSpec.VSphere.VCenters = []configv1.VSpherePlatformVCenterSpec{}
 	return &spec
 }
-
 
 func addSecondVCenterSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
 	spec := vsphere.CloneInfrastructureSpec(infra.Spec)
@@ -451,7 +456,6 @@ func ensureTemplateInSecondVC(lab *labconfig.LabConfig, infraID string) string {
 
 	return templateName
 }
-
 
 func fdReferencingRemovedVCenterSpec(infra *configv1.Infrastructure) *configv1.InfrastructureSpec {
 	spec := vsphere.CloneInfrastructureSpec(infra.Spec)

@@ -9,9 +9,9 @@ import (
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
 	"github.com/jcallen/testing-day2-vcenter/pkg/labconfig"
 	"github.com/jcallen/testing-day2-vcenter/pkg/vsphere"
-	configv1 "github.com/openshift/api/config/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -140,7 +140,11 @@ func waitForOrphanConditionFalse(timeout time.Duration) {
 		cond, err := framework.GetClusterOperatorCondition(suiteCtx, clients.Config,
 			framework.StorageOperatorName, configv1.ClusterStatusConditionType(framework.OrphanCleanupPendingCondition))
 		if err != nil {
-			return true
+			if time.Since(lastLog) >= 30*time.Second {
+				GinkgoWriter.Printf("  wait: could not read OrphanCleanupPending: %v\n", err)
+				lastLog = time.Now()
+			}
+			return false
 		}
 		if time.Since(lastLog) >= 30*time.Second {
 			GinkgoWriter.Printf("  wait: OrphanCleanupPending=%s\n", cond.Status)
@@ -176,11 +180,11 @@ func waitForOrphanConditionTrue(timeout time.Duration) {
 }
 
 func waitForStorageOperatorHealthy(timeout time.Duration) {
-	GinkgoWriter.Printf("  waiting for storage ClusterOperator healthy (timeout %v)\n", timeout)
-	err := framework.WaitForClusterOperatorAvailable(suiteCtx, clients.Config,
+	GinkgoWriter.Printf("  waiting for storage ClusterOperator stable (timeout %v)\n", timeout)
+	err := framework.WaitForClusterOperatorStable(suiteCtx, clients.Config,
 		framework.StorageOperatorName, timeout)
-	Expect(err).NotTo(HaveOccurred(), "storage ClusterOperator should be healthy")
-	GinkgoWriter.Println("  storage ClusterOperator healthy")
+	Expect(err).NotTo(HaveOccurred(), "storage ClusterOperator should be stable")
+	GinkgoWriter.Println("  storage ClusterOperator stable")
 }
 
 func requireSecondFDNode() {
@@ -191,10 +195,10 @@ func requireSecondFDNode() {
 
 // Shared state for MachineSet lifecycle across PV-SAFE and OBS-03 tests.
 var (
-	csiOpMSName        string
-	csiOpMSCreated     bool
-	secondFDNodeReady  bool
-	csiOpTestNS        []string
+	csiOpMSName       string
+	csiOpMSCreated    bool
+	secondFDNodeReady bool
+	csiOpTestNS       []string
 )
 
 var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label("csi-operator", "multi-vcenter", "mutating"), func() {
@@ -710,7 +714,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
 				GinkgoWriter.Println("  restoring Infrastructure backup")
-				_ = framework.RestoreInfrastructure(suiteCtx, clients.Config, backup)
+				restoreInfrastructureOrFail(backup)
 				waitForStorageOperatorHealthy(framework.OperatorSyncTimeout)
 			})
 
@@ -778,7 +782,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			backup, err := framework.BackupInfrastructure(suiteCtx, clients.Config)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
-				_ = framework.RestoreInfrastructure(suiteCtx, clients.Config, backup)
+				restoreInfrastructureOrFail(backup)
 				waitForStorageOperatorHealthy(framework.OperatorSyncTimeout)
 			})
 

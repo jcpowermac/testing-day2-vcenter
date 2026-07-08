@@ -12,6 +12,12 @@ import (
 	"github.com/jcallen/testing-day2-vcenter/pkg/labconfig"
 )
 
+const (
+	applyTimeout   = 45 * time.Minute
+	restoreTimeout = 45 * time.Minute
+	verifyTimeout  = 10 * time.Minute
+)
+
 func main() {
 	os.Exit(run())
 }
@@ -57,7 +63,7 @@ func runApply(args []string) int {
 		return 1
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), applyTimeout)
 	defer cancel()
 
 	result, err := lab.Apply(ctx, clients, cfg, lab.ApplyOptions{DryRun: *dryRun})
@@ -100,7 +106,7 @@ func runRestore(args []string) int {
 		return 1
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), restoreTimeout)
 	defer cancel()
 
 	if err := lab.Restore(ctx, clients, dir); err != nil {
@@ -128,7 +134,7 @@ func runVerify(args []string) int {
 		return 1
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), verifyTimeout)
 	defer cancel()
 
 	if err := lab.Verify(ctx, clients, cfg); err != nil {
