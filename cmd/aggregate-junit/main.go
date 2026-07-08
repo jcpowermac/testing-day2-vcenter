@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -110,6 +112,7 @@ type GridData struct {
 	Matrix    map[string]map[string]Result
 	PassRates map[string]float64
 	RunTotals map[string]RunSummary
+	DocLinks  map[string]string
 }
 
 type RunSummary struct {
@@ -119,6 +122,55 @@ type RunSummary struct {
 	Error   int
 	Missing int
 	Total   int
+}
+
+var testIDPattern = regexp.MustCompile(
+	`\b((?:N-(?:INF|SEQ|CFG|CM|OP|GATE|CRED|MACH|CPMS|MS|CSI(?:-INT|-STOR)?|RVC|VPD|TOPO)|SYNTH|TOPO|FD-(?:ADD|REM)|PV-SAFE|VC-REM|EDGE|OBS)-\d+(?:/\d+)*)`)
+
+func extractTestID(name string) string {
+	m := testIDPattern.FindStringSubmatch(name)
+	if len(m) < 2 {
+		return ""
+	}
+	return m[1]
+}
+
+func testIDToDocFile(id string) string {
+	return strings.ReplaceAll(id, "/", "-") + ".md"
+}
+
+func gitRepoBaseURL() string {
+	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
+	if err != nil {
+		return ""
+	}
+	remote := strings.TrimSpace(string(out))
+	remote = strings.TrimSuffix(remote, ".git")
+	if strings.HasPrefix(remote, "git@") {
+		remote = strings.Replace(remote, ":", "/", 1)
+		remote = strings.Replace(remote, "git@", "https://", 1)
+	}
+	return remote + "/blob/main"
+}
+
+func resolveDocLinks(tests []string) map[string]string {
+	baseURL := gitRepoBaseURL()
+	if baseURL == "" {
+		return nil
+	}
+
+	links := make(map[string]string)
+	for _, test := range tests {
+		id := extractTestID(test)
+		if id == "" {
+			continue
+		}
+		docFile := testIDToDocFile(id)
+		if _, err := os.Stat(filepath.Join("docs", "tests", docFile)); err == nil {
+			links[test] = baseURL + "/docs/tests/" + docFile
+		}
+	}
+	return links
 }
 
 func main() {
@@ -242,6 +294,8 @@ func buildGrid(resultsDir string) (*GridData, error) {
 		grid.RunTotals[run] = summary
 	}
 
+	grid.DocLinks = resolveDocLinks(grid.Tests)
+
 	return grid, nil
 }
 
@@ -362,6 +416,13 @@ func writeHTMLGrid(grid *GridData, path string) error {
 	tmpl := template.Must(template.New("grid").Funcs(template.FuncMap{
 		"shortName": shortName,
 		"rateClass": rateClass,
+		"testNameHTML": func(test string, links map[string]string) template.HTML {
+			name := template.HTMLEscapeString(shortName(test))
+			if url, ok := links[test]; ok {
+				return template.HTML(fmt.Sprintf(`<a href="%s">%s</a>`, template.HTMLEscapeString(url), name))
+			}
+			return template.HTML(name)
+		},
 	}).Parse(htmlSource))
 
 	return tmpl.Execute(f, grid)
@@ -380,6 +441,8 @@ const htmlSource = `<!DOCTYPE html>
   th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: center; white-space: nowrap; }
   th { background: #f6f8fa; font-weight: 600; }
   th.test-name, td.test-name { text-align: left; max-width: 500px; overflow: hidden; text-overflow: ellipsis; }
+  td.test-name a { color: #0969da; text-decoration: none; }
+  td.test-name a:hover { text-decoration: underline; }
   td.pass { background: #dafbe1; }
   td.fail { background: #ffcecb; }
   td.skip { background: #fff8c5; }
@@ -407,7 +470,7 @@ const htmlSource = `<!DOCTYPE html>
 <tbody>
   {{range $test := .Tests}}
   <tr>
-    <td class="test-name" title="{{$test}}">{{shortName $test}}</td>
+    <td class="test-name" title="{{$test}}">{{testNameHTML $test $.DocLinks}}</td>
     {{range $run := $.Runs -}}
     {{- $results := index $.Matrix $test -}}
     {{- $r := index $results $run -}}
