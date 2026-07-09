@@ -2,43 +2,212 @@ package framework
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
-// ScrapeOperatorMetrics finds a Running pod matching the label selector in the
-// given namespace and scrapes its /metrics endpoint via the Kubernetes API
-// server proxy. It returns the raw Prometheus text-format metrics body.
+// ScrapeOperatorMetrics queries the cluster's Thanos endpoint for all metrics
+// emitted by the operator and returns them in Prometheus text exposition format
+// so that ParseMetricValue continues to work unchanged.
+//
+// The operator's metrics endpoint requires mTLS (via kube-rbac-proxy), which
+// makes Pod ProxyGet unusable. Instead we read the already-scraped data from
+// the in-cluster Thanos instance.
 func ScrapeOperatorMetrics(ctx context.Context, client kubernetes.Interface, namespace, labelSelector string) (string, error) {
-	pods, err := ListPodsByLabel(ctx, client, namespace, labelSelector)
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		cfg, err = loadRestConfig()
+		if err != nil {
+			return "", fmt.Errorf("scrape metrics: build rest config: %w", err)
+		}
+	}
+
+	thanosHost, err := thanosQuerierHost(ctx, cfg)
 	if err != nil {
 		return "", fmt.Errorf("scrape metrics: %w", err)
 	}
 
-	var podName string
-	for i := range pods {
-		if pods[i].Status.Phase == corev1.PodRunning {
-			podName = pods[i].Name
-			break
+	token, err := prometheusToken(ctx, client)
+	if err != nil {
+		return "", fmt.Errorf("scrape metrics: %w", err)
+	}
+
+	job := jobNameFromLabelSelector(labelSelector)
+	query := fmt.Sprintf(`{job="%s"}`, job)
+	raw, err := queryThanos(ctx, thanosHost, token, query)
+	if err != nil {
+		return "", fmt.Errorf("scrape metrics: %w", err)
+	}
+
+	text, err := vectorToText(raw)
+	if err != nil {
+		return "", fmt.Errorf("scrape metrics: %w", err)
+	}
+	return text, nil
+}
+
+// thanosQuerierHost returns the host of the thanos-querier route.
+func thanosQuerierHost(ctx context.Context, cfg *rest.Config) (string, error) {
+	dyn, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return "", fmt.Errorf("dynamic client: %w", err)
+	}
+	routeGVR := schema.GroupVersionResource{Group: "route.openshift.io", Version: "v1", Resource: "routes"}
+	obj, err := dyn.Resource(routeGVR).Namespace("openshift-monitoring").Get(ctx, "thanos-querier", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("get thanos-querier route: %w", err)
+	}
+	host, found, err := unstructuredString(obj.Object, "spec", "host")
+	if err != nil || !found || host == "" {
+		return "", fmt.Errorf("thanos-querier route has no spec.host")
+	}
+	return host, nil
+}
+
+func unstructuredString(obj map[string]interface{}, fields ...string) (string, bool, error) {
+	cur := obj
+	for i, f := range fields {
+		v, ok := cur[f]
+		if !ok {
+			return "", false, nil
+		}
+		if i == len(fields)-1 {
+			s, ok := v.(string)
+			return s, ok, nil
+		}
+		next, ok := v.(map[string]interface{})
+		if !ok {
+			return "", false, fmt.Errorf("field %q is not a map", f)
+		}
+		cur = next
+	}
+	return "", false, nil
+}
+
+// prometheusToken creates a short-lived token for the prometheus-k8s SA.
+func prometheusToken(ctx context.Context, client kubernetes.Interface) (string, error) {
+	expiry := int64(600)
+	tr, err := client.CoreV1().ServiceAccounts("openshift-monitoring").CreateToken(
+		ctx,
+		"prometheus-k8s",
+		&authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				ExpirationSeconds: &expiry,
+			},
+		},
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		return "", fmt.Errorf("create prometheus-k8s token: %w", err)
+	}
+	return tr.Status.Token, nil
+}
+
+// jobNameFromLabelSelector converts "name=vmware-vsphere-csi-driver-operator"
+// into the Prometheus job name "vmware-vsphere-csi-driver-operator-metrics".
+func jobNameFromLabelSelector(selector string) string {
+	parts := strings.SplitN(selector, "=", 2)
+	name := selector
+	if len(parts) == 2 {
+		name = parts[1]
+	}
+	return name + "-metrics"
+}
+
+// queryThanos hits the Thanos querier /api/v1/query endpoint.
+func queryThanos(ctx context.Context, host, token, query string) (json.RawMessage, error) {
+	u := fmt.Sprintf("https://%s/api/v1/query", host)
+	form := url.Values{"query": {query}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("thanos query: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read thanos response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("thanos returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var parsed struct {
+		Status string          `json:"status"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("decode thanos response: %w", err)
+	}
+	if parsed.Status != "success" {
+		return nil, fmt.Errorf("thanos query status: %s", parsed.Status)
+	}
+	return parsed.Data, nil
+}
+
+// vectorToText converts a Thanos instant-query vector result into Prometheus
+// text exposition format so that ParseMetricValue works unchanged.
+func vectorToText(data json.RawMessage) (string, error) {
+	var envelope struct {
+		ResultType string `json:"resultType"`
+		Result     []struct {
+			Metric map[string]string `json:"metric"`
+			Value  [2]interface{}    `json:"value"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return "", fmt.Errorf("decode vector: %w", err)
+	}
+
+	var b strings.Builder
+	for _, r := range envelope.Result {
+		name := r.Metric["__name__"]
+		delete(r.Metric, "__name__")
+
+		var labels []string
+		for k, v := range r.Metric {
+			labels = append(labels, fmt.Sprintf(`%s="%s"`, k, v))
+		}
+
+		val := "0"
+		if len(r.Value) == 2 {
+			if s, ok := r.Value[1].(string); ok {
+				val = s
+			}
+		}
+
+		if len(labels) > 0 {
+			fmt.Fprintf(&b, "%s{%s} %s\n", name, strings.Join(labels, ","), val)
+		} else {
+			fmt.Fprintf(&b, "%s %s\n", name, val)
 		}
 	}
-	if podName == "" {
-		return "", fmt.Errorf("scrape metrics: no Running pod found in %s with selector %q", namespace, labelSelector)
-	}
-
-	body, err := client.CoreV1().
-		Pods(namespace).
-		ProxyGet("https", podName, "vsphere-omp", "/metrics", nil).
-		DoRaw(ctx)
-	if err != nil {
-		return "", fmt.Errorf("scrape metrics from pod %s: %w", podName, err)
-	}
-
-	return string(body), nil
+	return b.String(), nil
 }
 
 // ParseMetricValue searches Prometheus text-format metrics for a line matching
@@ -56,14 +225,11 @@ func ParseMetricValue(metricsText, metricName string, labels map[string]string) 
 			continue
 		}
 
-		// Split "metric_name{labels} value" or "metric_name value" into name part and value.
-		// The value is always the last whitespace-separated token.
 		name, value, ok := splitMetricLine(line)
 		if !ok {
 			continue
 		}
 
-		// Separate the bare metric name from the optional {labels} block.
 		bareName, labelBlock := splitNameAndLabels(name)
 		if bareName != metricName {
 			continue
@@ -86,7 +252,6 @@ func ParseMetricValue(metricsText, metricName string, labels map[string]string) 
 // optional labels) and the value string. Returns false if the line does not
 // have the expected format.
 func splitMetricLine(line string) (name, value string, ok bool) {
-	// Handle "{...} value" — find the closing brace first.
 	if idx := strings.Index(line, "}"); idx != -1 {
 		rest := strings.TrimSpace(line[idx+1:])
 		parts := strings.Fields(rest)
@@ -141,7 +306,6 @@ func parseLabelBlock(block string) map[string]string {
 		}
 		key := pair[:eqIdx]
 		val := pair[eqIdx+1:]
-		// Strip surrounding quotes.
 		val = strings.Trim(val, "\"")
 		result[key] = val
 	}
