@@ -156,6 +156,20 @@ for i in $(seq 1 "$RUNS"); do
     # Clean reports for next run
     rm -f reports/*.xml
 
+    # --- Collect must-gather before destroy ---
+    log "$RUN_LABEL: collecting must-gather"
+    if command -v oc >/dev/null 2>&1; then
+        MUST_GATHER_DIR="$RUN_DIR/must-gather"
+        rm -rf "$MUST_GATHER_DIR"
+        if oc adm must-gather --dest-dir "$MUST_GATHER_DIR" 2>&1 | tee "$RUN_DIR/must-gather.log"; then
+            log "$RUN_LABEL: must-gather saved to $MUST_GATHER_DIR"
+        else
+            log "$RUN_LABEL: WARNING - must-gather failed"
+        fi
+    else
+        log "$RUN_LABEL: WARNING - oc not found, skipping must-gather"
+    fi
+
     # --- Destroy cluster ---
     log "$RUN_LABEL: destroying cluster"
     cd "$INSTALL_DIR"
