@@ -347,6 +347,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			return
 		}
 		GinkgoWriter.Printf("cleaning up MachineSet %s\n", csiOpMSName)
+		nodeNames := framework.NodeNamesForMachineSet(suiteCtx, clients.Machine, csiOpMSName)
 		_ = framework.ScaleMachineSet(suiteCtx, clients.Machine, csiOpMSName, 0)
 		err := framework.WaitForMachineSetDrainedWithLog(suiteCtx, clients.Machine, csiOpMSName, framework.LongTimeout)
 		if err != nil {
@@ -354,6 +355,7 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			framework.ForceDeleteMachineSetMachines(suiteCtx, clients.Machine, csiOpMSName)
 		}
 		_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, csiOpMSName)
+		framework.DeleteNodes(suiteCtx, clients.Kube, nodeNames)
 	})
 
 	// ── Category 1: Failure Domain Addition — Operator Response ──

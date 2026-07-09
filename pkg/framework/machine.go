@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 )
 
 // ExtractVSphereMachineProviderSpec unmarshals the raw providerSpec from a Machine.
@@ -291,6 +292,33 @@ func CreateMachineSet(ctx context.Context, client machineclient.Interface, ms *m
 // DeleteMachineSet deletes a MachineSet by name in the machine API namespace.
 func DeleteMachineSet(ctx context.Context, client machineclient.Interface, name string) error {
 	return client.MachineV1beta1().MachineSets(MachineAPINamespace).Delete(ctx, name, metav1.DeleteOptions{})
+}
+
+// NodeNamesForMachineSet returns the node names referenced by Machines in the
+// given MachineSet. Call this before scaling down or deleting the MachineSet,
+// since the Machine objects (and their nodeRefs) are lost after deletion.
+func NodeNamesForMachineSet(ctx context.Context, client machineclient.Interface, msName string) []string {
+	machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+	})
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, m := range machines.Items {
+		if m.Status.NodeRef != nil && m.Status.NodeRef.Name != "" {
+			names = append(names, m.Status.NodeRef.Name)
+		}
+	}
+	return names
+}
+
+// DeleteNodes deletes the named node objects. Errors are silently ignored
+// (the node may already be gone).
+func DeleteNodes(ctx context.Context, client kubernetes.Interface, names []string) {
+	for _, name := range names {
+		_ = client.CoreV1().Nodes().Delete(ctx, name, metav1.DeleteOptions{})
+	}
 }
 
 // CloneMachineSetForFD clones a MachineSet with providerSpec workspace rewritten

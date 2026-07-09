@@ -72,11 +72,13 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 			created, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
+				nodeNames := framework.NodeNamesForMachineSet(suiteCtx, clients.Machine, created.Name)
 				_ = framework.ScaleMachineSet(suiteCtx, clients.Machine, created.Name, 0)
 				Eventually(func() error {
 					return framework.WaitForMachineSetDrained(suiteCtx, clients.Machine, created.Name)
 				}).WithTimeout(framework.LongTimeout).WithPolling(framework.DefaultPolling).Should(Succeed())
 				_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, created.Name)
+				framework.DeleteNodes(suiteCtx, clients.Kube, nodeNames)
 			})
 
 			GinkgoWriter.Printf("waiting for MachineSet %s to scale to 1...\n", msName)
