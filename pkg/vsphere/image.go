@@ -219,6 +219,29 @@ func FindTemplateByName(ctx context.Context, s *Session, templateName string) (s
 	return vm.InventoryPath, true, nil
 }
 
+func DeleteTemplate(ctx context.Context, s *Session, templateName string) error {
+	log := klog.FromContext(ctx)
+
+	vm, err := s.Finder.VirtualMachine(ctx, templateName)
+	if err != nil {
+		if _, ok := err.(*find.NotFoundError); ok {
+			log.V(1).Info("template already absent, nothing to delete", "name", templateName)
+			return nil
+		}
+		return fmt.Errorf("finding template %q: %w", templateName, err)
+	}
+
+	task, err := vm.Destroy(ctx)
+	if err != nil {
+		return fmt.Errorf("destroying template %q: %w", templateName, err)
+	}
+	if err := task.Wait(ctx); err != nil {
+		return fmt.Errorf("waiting for template %q destruction: %w", templateName, err)
+	}
+	log.V(1).Info("deleted template", "name", templateName)
+	return nil
+}
+
 // ImportOVAParams holds parameters for importing an OVA into vCenter.
 type ImportOVAParams struct {
 	Session          *Session

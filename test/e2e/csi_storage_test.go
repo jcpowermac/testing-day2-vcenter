@@ -212,6 +212,8 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		topoKeys       *framework.CSITopologyKeys
 		msName         string
 		msCreated      bool
+		templateName   string
+		infraID        string
 		testNamespaces []string
 	)
 
@@ -235,10 +237,10 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			return
 		}
 
-		infraID := infra.Status.InfrastructureName
+		infraID = infra.Status.InfrastructureName
 		Expect(infraID).NotTo(BeEmpty(), "infrastructure.status.infrastructureName must be set")
 
-		templateName := ensureTemplateInSecondVC(lab, infraID)
+		templateName = ensureTemplateInSecondVC(lab, infraID)
 		lab.FailureDomain.Topology.Template = templateName
 
 		machineSets := listMachineSets()
@@ -300,6 +302,33 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			framework.ForceDeleteMachineSetMachines(ctx, clients.Machine, msName)
 		}
 		_ = framework.DeleteMachineSet(ctx, clients.Machine, msName)
+
+		if templateName != "" && lab != nil {
+			GinkgoWriter.Printf("cleaning up template %s on second vCenter\n", templateName)
+			password, pwErr := lab.SecondVCenter.PasswordValue()
+			if pwErr == nil {
+				sess, sessErr := vsphere.NewSession(ctx, vsphere.Params{
+					Server:     lab.SecondVCenter.Server,
+					Datacenter: lab.FailureDomain.Topology.Datacenter,
+					Username:   lab.SecondVCenter.Username,
+					Password:   password,
+					Insecure:   true,
+				})
+				if sessErr == nil {
+					defer sess.Close(ctx)
+					if err := vsphere.DeleteTemplate(ctx, sess, templateName); err != nil {
+						GinkgoWriter.Printf("template %s deletion failed: %v\n", templateName, err)
+					}
+					if infraID != "" {
+						if err := vsphere.DeleteVMFolder(ctx, sess, infraID); err != nil {
+							GinkgoWriter.Printf("VM folder %s deletion failed: %v\n", infraID, err)
+						}
+					}
+				} else {
+					GinkgoWriter.Printf("second vCenter session failed, skipping template cleanup: %v\n", sessErr)
+				}
+			}
+		}
 	})
 
 	It("should provision a PV in new failure domain with correct topology labels (N-CSI-05)", Label("p1"), func() {

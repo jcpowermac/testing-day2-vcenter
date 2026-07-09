@@ -243,6 +243,8 @@ var (
 	csiOpMSCreated    bool
 	secondFDNodeReady bool
 	csiOpTestNS       []string
+	csiOpTemplateName string
+	csiOpInfraID      string
 )
 
 var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label("csi-operator", "multi-vcenter", "mutating"), func() {
@@ -275,12 +277,12 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			return
 		}
 
-		id := infra.Status.InfrastructureName
-		Expect(id).NotTo(BeEmpty(), "infrastructure.status.infrastructureName must be set")
+		csiOpInfraID = infra.Status.InfrastructureName
+		Expect(csiOpInfraID).NotTo(BeEmpty(), "infrastructure.status.infrastructureName must be set")
 
 		GinkgoWriter.Println("no nodes in second FD — creating MachineSet")
-		templateName := ensureTemplateInSecondVC(lab, id)
-		lab.FailureDomain.Topology.Template = templateName
+		csiOpTemplateName = ensureTemplateInSecondVC(lab, csiOpInfraID)
+		lab.FailureDomain.Topology.Template = csiOpTemplateName
 
 		machineSets := listMachineSets()
 		Expect(machineSets).NotTo(BeEmpty(), "need at least one MachineSet to clone")
@@ -342,6 +344,34 @@ var _ = Describe("CSI Operator Failure Domain Lifecycle", Serial, Ordered, Label
 			framework.ForceDeleteMachineSetMachines(suiteCtx, clients.Machine, csiOpMSName)
 		}
 		_ = framework.DeleteMachineSet(suiteCtx, clients.Machine, csiOpMSName)
+
+		if csiOpTemplateName != "" {
+			lab := requireLabConfigWithFD()
+			GinkgoWriter.Printf("cleaning up template %s on second vCenter\n", csiOpTemplateName)
+			password, pwErr := lab.SecondVCenter.PasswordValue()
+			if pwErr == nil {
+				sess, sessErr := vsphere.NewSession(suiteCtx, vsphere.Params{
+					Server:     lab.SecondVCenter.Server,
+					Datacenter: lab.FailureDomain.Topology.Datacenter,
+					Username:   lab.SecondVCenter.Username,
+					Password:   password,
+					Insecure:   true,
+				})
+				if sessErr == nil {
+					defer sess.Close(suiteCtx)
+					if err := vsphere.DeleteTemplate(suiteCtx, sess, csiOpTemplateName); err != nil {
+						GinkgoWriter.Printf("template %s deletion failed: %v\n", csiOpTemplateName, err)
+					}
+					if csiOpInfraID != "" {
+						if err := vsphere.DeleteVMFolder(suiteCtx, sess, csiOpInfraID); err != nil {
+							GinkgoWriter.Printf("VM folder %s deletion failed: %v\n", csiOpInfraID, err)
+						}
+					}
+				} else {
+					GinkgoWriter.Printf("second vCenter session failed, skipping template cleanup: %v\n", sessErr)
+				}
+			}
+		}
 	})
 
 	// ── Category 1: Failure Domain Addition — Operator Response ──

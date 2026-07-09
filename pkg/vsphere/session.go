@@ -191,6 +191,30 @@ func EnsureVMFolder(ctx context.Context, s *Session, folderName string) error {
 	return nil
 }
 
+func DeleteVMFolder(ctx context.Context, s *Session, folderName string) error {
+	log := klog.FromContext(ctx)
+
+	path := fmt.Sprintf("/%s/vm/%s", s.Datacenter, folderName)
+	folder, err := s.Finder.Folder(ctx, path)
+	if err != nil {
+		if _, ok := err.(*find.NotFoundError); ok {
+			log.V(1).Info("VM folder already absent", "path", path)
+			return nil
+		}
+		return fmt.Errorf("finding VM folder %q: %w", path, err)
+	}
+
+	task, err := folder.Destroy(ctx)
+	if err != nil {
+		return fmt.Errorf("destroying VM folder %q: %w", path, err)
+	}
+	if err := task.Wait(ctx); err != nil {
+		return fmt.Errorf("waiting for VM folder %q destruction: %w", path, err)
+	}
+	log.V(1).Info("deleted VM folder", "path", path)
+	return nil
+}
+
 // ClearSessions logs out and removes all cached sessions.
 func ClearSessions(ctx context.Context) {
 	sessionMu.Lock()
