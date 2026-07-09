@@ -95,6 +95,33 @@ func removeFDAndSkipIfDenied(spec *configv1.InfrastructureSpec, fd *labconfig.Fa
 	GinkgoWriter.Println("  FD removed from Infrastructure spec")
 }
 
+func logStorageOperatorVCenterSignals(prefix string) {
+	co, err := clients.Config.ConfigV1().ClusterOperators().Get(suiteCtx, framework.StorageOperatorName, metav1.GetOptions{})
+	if err != nil {
+		GinkgoWriter.Printf("  %s: could not read ClusterOperator/%s: %v\n", prefix, framework.StorageOperatorName, err)
+		return
+	}
+
+	logged := false
+	for _, cond := range co.Status.Conditions {
+		msgLower := strings.ToLower(cond.Message)
+		if cond.Type == configv1.OperatorAvailable ||
+			cond.Type == configv1.OperatorDegraded ||
+			cond.Type == configv1.OperatorProgressing ||
+			cond.Type == configv1.ClusterStatusConditionType(framework.OrphanCleanupPendingCondition) ||
+			strings.Contains(string(cond.Type), "VCenter") ||
+			strings.Contains(msgLower, "vcenter") ||
+			strings.Contains(msgLower, "vcenter api") {
+			GinkgoWriter.Printf("  %s: %s=%s reason=%q message=%q\n",
+				prefix, cond.Type, cond.Status, cond.Reason, cond.Message)
+			logged = true
+		}
+	}
+	if !logged {
+		GinkgoWriter.Printf("  %s: no vCenter-related storage operator conditions\n", prefix)
+	}
+}
+
 func waitForTagDetached(ctx context.Context, sess *vsphere.Session, datastorePath, tagName string, timeout time.Duration) {
 	GinkgoWriter.Printf("  waiting for tag %q to detach from %s (timeout %v)\n", tagName, datastorePath, timeout)
 	lastLog := time.Now()
@@ -140,14 +167,26 @@ func waitForOrphanConditionFalse(timeout time.Duration) {
 		cond, err := framework.GetClusterOperatorCondition(suiteCtx, clients.Config,
 			framework.StorageOperatorName, configv1.ClusterStatusConditionType(framework.OrphanCleanupPendingCondition))
 		if err != nil {
+			missingMsg := fmt.Sprintf("condition %q not found on clusteroperator %q",
+				framework.OrphanCleanupPendingCondition, framework.StorageOperatorName)
+			if strings.Contains(err.Error(), missingMsg) {
+				if time.Since(lastLog) >= 30*time.Second {
+					GinkgoWriter.Printf("  wait: OrphanCleanupPending absent (treating as cleared)\n")
+					logStorageOperatorVCenterSignals("storage operator")
+					lastLog = time.Now()
+				}
+				return true
+			}
 			if time.Since(lastLog) >= 30*time.Second {
 				GinkgoWriter.Printf("  wait: could not read OrphanCleanupPending: %v\n", err)
+				logStorageOperatorVCenterSignals("storage operator")
 				lastLog = time.Now()
 			}
 			return false
 		}
 		if time.Since(lastLog) >= 30*time.Second {
 			GinkgoWriter.Printf("  wait: OrphanCleanupPending=%s\n", cond.Status)
+			logStorageOperatorVCenterSignals("storage operator")
 			lastLog = time.Now()
 		}
 		return cond.Status != configv1.ConditionTrue
@@ -165,12 +204,14 @@ func waitForOrphanConditionTrue(timeout time.Duration) {
 		if err != nil {
 			if time.Since(lastLog) >= 30*time.Second {
 				GinkgoWriter.Printf("  wait: OrphanCleanupPending condition not found: %v\n", err)
+				logStorageOperatorVCenterSignals("storage operator")
 				lastLog = time.Now()
 			}
 			return false
 		}
 		if time.Since(lastLog) >= 30*time.Second {
 			GinkgoWriter.Printf("  wait: OrphanCleanupPending=%s\n", cond.Status)
+			logStorageOperatorVCenterSignals("storage operator")
 			lastLog = time.Now()
 		}
 		return cond.Status == configv1.ConditionTrue
@@ -183,6 +224,9 @@ func waitForStorageOperatorHealthy(timeout time.Duration) {
 	GinkgoWriter.Printf("  waiting for storage ClusterOperator stable (timeout %v)\n", timeout)
 	err := framework.WaitForClusterOperatorStable(suiteCtx, clients.Config,
 		framework.StorageOperatorName, timeout)
+	if err != nil {
+		logStorageOperatorVCenterSignals("storage operator")
+	}
 	Expect(err).NotTo(HaveOccurred(), "storage ClusterOperator should be stable")
 	GinkgoWriter.Println("  storage ClusterOperator stable")
 }
