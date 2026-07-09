@@ -227,14 +227,12 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 			"Infrastructure should contain failure domain region=%s zone=%s — run make apply-lab first",
 			lab.FailureDomain.Region, lab.FailureDomain.Zone)
 
-		nodes, err := clients.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		nodeName, found, err := framework.FindReadyNodeInTopology(
+			ctx, clients.Kube, topoKeys, lab.FailureDomain.Region, lab.FailureDomain.Zone)
 		Expect(err).NotTo(HaveOccurred())
-		for _, node := range nodes.Items {
-			if node.Labels[topoKeys.Region] == lab.FailureDomain.Region &&
-				node.Labels[topoKeys.Zone] == lab.FailureDomain.Zone {
-				GinkgoWriter.Printf("found existing node %s in lab FD, skipping MachineSet creation\n", node.Name)
-				return
-			}
+		if found {
+			GinkgoWriter.Printf("found existing Ready node %s in lab FD, skipping MachineSet creation\n", nodeName)
+			return
 		}
 
 		infraID := infra.Status.InfrastructureName
@@ -272,22 +270,13 @@ var _ = Describe("CSI storage in new failure domain", Ordered, Label("real-vcent
 		}, framework.LongTimeout, framework.DefaultPolling).Should(Succeed(),
 			"Machine in new FD should reach Running/Provisioned")
 
-		GinkgoWriter.Println("waiting for new node to get CSI topology labels")
-		Eventually(func() bool {
-			nodeList, err := clients.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-			if err != nil {
-				return false
-			}
-			for _, node := range nodeList.Items {
-				if node.Labels[topoKeys.Region] == lab.FailureDomain.Region &&
-					node.Labels[topoKeys.Zone] == lab.FailureDomain.Zone {
-					return true
-				}
-			}
-			return false
-		}, framework.LongTimeout, framework.DefaultPolling).Should(BeTrue(),
-			"a node with CSI topology labels region=%s zone=%s should appear",
+		GinkgoWriter.Println("waiting for Ready node in new CSI topology")
+		nodeName, err = framework.WaitForReadyNodeInTopology(
+			ctx, clients.Kube, topoKeys, lab.FailureDomain.Region, lab.FailureDomain.Zone, framework.LongTimeout)
+		Expect(err).NotTo(HaveOccurred(),
+			"a Ready node with CSI topology labels region=%s zone=%s should appear",
 			lab.FailureDomain.Region, lab.FailureDomain.Zone)
+		GinkgoWriter.Printf("Ready node %s found in zone=%s\n", nodeName, lab.FailureDomain.Zone)
 	})
 
 	AfterAll(NodeTimeout(20*time.Minute), func(ctx SpecContext) {

@@ -24,6 +24,59 @@ type CSITopologyKeys struct {
 	Zone   string
 }
 
+// FindReadyNodeInTopology returns a non-deleting Ready node that matches the
+// given CSI topology labels, if one exists.
+func FindReadyNodeInTopology(ctx context.Context, client kubernetes.Interface, keys *CSITopologyKeys, region, zone string) (string, bool, error) {
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", false, fmt.Errorf("list nodes: %w", err)
+	}
+	for _, node := range nodes.Items {
+		if node.DeletionTimestamp != nil {
+			continue
+		}
+		if node.Labels[keys.Region] != region || node.Labels[keys.Zone] != zone {
+			continue
+		}
+		for _, cond := range node.Status.Conditions {
+			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
+				return node.Name, true, nil
+			}
+		}
+	}
+	return "", false, nil
+}
+
+// WaitForReadyNodeInTopology waits for a non-deleting Ready node with the
+// target CSI topology labels to appear.
+func WaitForReadyNodeInTopology(ctx context.Context, client kubernetes.Interface, keys *CSITopologyKeys, region, zone string, timeout time.Duration) (string, error) {
+	var (
+		lastErr  error
+		nodeName string
+	)
+	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		name, found, err := FindReadyNodeInTopology(ctx, client, keys, region, zone)
+		if err != nil {
+			lastErr = err
+			return false, nil
+		}
+		if !found {
+			lastErr = fmt.Errorf("no Ready node found for region=%s zone=%s", region, zone)
+			return false, nil
+		}
+		nodeName = name
+		lastErr = nil
+		return true, nil
+	})
+	if pollErr != nil {
+		if lastErr != nil {
+			return "", fmt.Errorf("%w: %v", pollErr, lastErr)
+		}
+		return "", pollErr
+	}
+	return nodeName, nil
+}
+
 // DiscoverCSITopologyKeys reads CSINode objects to find the actual topology keys
 // registered by the vSphere CSI driver. The keys depend on vCenter tag category
 // names (e.g. "openshift-region" → "topology.csi.vmware.com/openshift-region").

@@ -114,6 +114,9 @@ func WaitForMachineSetMachines(ctx context.Context, client machineclient.Interfa
 	}
 	ready := 0
 	for _, m := range machines.Items {
+		if m.DeletionTimestamp != nil {
+			continue
+		}
 		if m.Status.Phase != nil && *m.Status.Phase == "Running" {
 			ready++
 		}
