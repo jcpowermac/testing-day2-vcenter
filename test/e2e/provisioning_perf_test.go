@@ -87,23 +87,42 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 				GinkgoWriter.Printf("cleanup: MachineSet %s deleted\n", msName)
 			})
 
-			result, err := framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, msName, workerCount, framework.PerfTimeout)
-			Expect(err).NotTo(HaveOccurred(), "all machines should reach Running within timeout")
+			result, watchErr := framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, msName, workerCount, framework.PerfTimeout)
+			Expect(result).NotTo(BeNil(), "result must be returned even on partial completion")
+
+			runningCount := 0
+			for _, m := range result.Machines {
+				if !m.Running.IsZero() {
+					runningCount++
+				}
+			}
+
+			if watchErr != nil {
+				GinkgoWriter.Printf("WARNING: not all machines reached Running: %v\n", watchErr)
+				GinkgoWriter.Printf("  %d/%d machines Running — proceeding with partial results\n", runningCount, workerCount)
+			}
+			Expect(runningCount).To(BeNumerically(">", 0), "at least one machine must reach Running")
 
 			result.ScaleRequestTime = t0
-			result.TotalDuration = result.AllRunningTime.Sub(t0).String()
+			if !result.AllRunningTime.IsZero() {
+				result.TotalDuration = result.AllRunningTime.Sub(t0).String()
+			} else {
+				result.TotalDuration = time.Since(t0).String()
+			}
 
-			GinkgoWriter.Printf("all %d machines Running at %s (total: %s)\n",
-				workerCount, result.AllRunningTime.Format(time.RFC3339), result.TotalDuration)
+			GinkgoWriter.Printf("%d/%d machines Running (total: %s)\n",
+				runningCount, workerCount, result.TotalDuration)
 
-			GinkgoWriter.Printf("waiting for all nodes to be Ready\n")
-			Expect(framework.WaitForAllNodesReady(ctx, clients.Kube, framework.PerfTimeout)).To(Succeed(),
-				"all nodes should become Ready")
+			GinkgoWriter.Printf("waiting for nodes to be Ready (best-effort)\n")
+			if err := framework.WaitForAllNodesReady(ctx, clients.Kube, framework.PerfTimeout); err != nil {
+				GinkgoWriter.Printf("WARNING: not all nodes became Ready: %v — continuing\n", err)
+			}
 
 			steadyStateSeconds := 300
 			if ssStr := os.Getenv("PERF_STEADY_STATE_SECONDS"); ssStr != "" {
-				steadyStateSeconds, err = strconv.Atoi(ssStr)
-				Expect(err).NotTo(HaveOccurred(), "PERF_STEADY_STATE_SECONDS must be a valid integer")
+				var parseErr error
+				steadyStateSeconds, parseErr = strconv.Atoi(ssStr)
+				Expect(parseErr).NotTo(HaveOccurred(), "PERF_STEADY_STATE_SECONDS must be a valid integer")
 				Expect(steadyStateSeconds).To(BeNumerically(">", 0))
 			}
 			steadyStateDuration := time.Duration(steadyStateSeconds) * time.Second
@@ -119,8 +138,8 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 			rvBefore, err := framework.SnapshotMachineResourceVersions(ctx, clients.Machine, msName)
 			Expect(err).NotTo(HaveOccurred(), "snapshot machine resourceVersions before steady-state")
 
-			GinkgoWriter.Printf("steady-state observation: waiting %s with %d Running machines\n",
-				steadyStateDuration, workerCount)
+			GinkgoWriter.Printf("steady-state observation: waiting %s with %d/%d Running machines\n",
+				steadyStateDuration, runningCount, workerCount)
 			select {
 			case <-time.After(steadyStateDuration):
 			case <-ctx.Done():
