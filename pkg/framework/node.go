@@ -89,7 +89,11 @@ func releaseDHCPOnNode(ctx context.Context, nodeName string) error {
 
 	err := cmd.Run()
 	if nodeCtx.Err() != nil {
-		// Timeout after command was sent — node lost network, expected
+		return nil
+	}
+	if err != nil && bytes.Contains(stderr.Bytes(), []byte("i/o timeout")) {
+		// nmcli ran and brought down the interface; oc debug failed
+		// streaming logs from the now-offline kubelet. That's success.
 		return nil
 	}
 	if err != nil {
