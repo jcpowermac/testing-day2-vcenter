@@ -139,6 +139,12 @@
 | [N-TOPO-01](tests/N-TOPO-01.md) | Create 1-replica MachineSet, removing its FD denied by VAP, scale down and cleanup | cluster-config-operator | MAO#1510 |
 | [N-TOPO-02](tests/N-TOPO-02.md) | Add fake vCenter, wait for reconciliation, remove it, confirm no stale config | cluster-config-operator | CCMO#469 |
 
+## Provisioning Performance (`provisioning_perf_test.go`) [mutating, perf, p1]
+
+| Test ID | Description | Component | PR/Issue |
+|---|---|---|---|
+| [PERF-01](tests/PERF-01.md) | Provision N machines (default 64) and record per-machine phase timing for A/B comparison | machine-api-operator | MAO#1515 |
+
 ## Real vCenter Day 2 (`real_vcenter_test.go`) [real-vcenter, p0, mutating]
 
 | Test ID | Description | Component | PR/Issue |
@@ -220,3 +226,4 @@ test (OBS-03 analog) are deferred — see `plans/new-csi-operator-test-topology-
 | MAO#1510 | [openshift/machine-api-operator#1510](https://github.com/openshift/machine-api-operator/pull/1510) | SPLAT-2790 | Added new VAP for vSphere infra validation |
 | VPD#224 | [openshift/vsphere-problem-detector#224](https://github.com/openshift/vsphere-problem-detector/pull/224) | OCPBUGS-87906 | Fixed GetVCenter to handle removed FDs better |
 | csi-op#348 | [openshift/vmware-vsphere-csi-driver-operator#348](https://github.com/openshift/vmware-vsphere-csi-driver-operator/pull/348) | | FD lifecycle: orphan tag cleanup, SPBM profile management, PV-safe detach |
+| MAO#1515 | [openshift/machine-api-operator#1515](https://github.com/openshift/machine-api-operator/pull/1515) | | Reduce vCenter API load for large vSphere clusters |

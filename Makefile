@@ -1,4 +1,4 @@
-.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-csi-topology test-csi-orphan test-real test-e2e apply-lab restore-lab verify-lab aggregate-junit
+.PHONY: vet build test-dry-run test-readonly test-p0 test-mutating test-storage test-storage-readonly test-csi-operator test-csi-topology test-csi-orphan test-real test-perf test-e2e apply-lab restore-lab verify-lab aggregate-junit
 
 GINKGO ?= $(shell go env GOPATH)/bin/ginkgo
 GINKGO_FLAGS ?= -v
@@ -41,7 +41,7 @@ test-p0:
 
 test-mutating:
 	@mkdir -p $(REPORT_DIR)
-	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=mutating.xml --label-filter="mutating" ./test/e2e/
+	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=mutating.xml --label-filter="mutating && !perf" ./test/e2e/
 
 test-storage:
 	@mkdir -p $(REPORT_DIR)
@@ -71,6 +71,10 @@ test-csi-orphan:
 	@mkdir -p $(REPORT_DIR)
 	test -f $(CONFIG) || (echo "missing $(CONFIG) — copy config/lab.yaml.example and edit"; exit 1)
 	RUN_E2E=1 E2E_LAB_CONFIG=$(abspath $(CONFIG)) $(GINKGO) $(GINKGO_FLAGS) $(GINKGO_REPORT)=csi-orphan.xml --label-filter="csi-orphan" ./test/e2e/
+
+test-perf:
+	@mkdir -p $(REPORT_DIR)
+	RUN_E2E=1 $(GINKGO) $(GINKGO_FLAGS) --timeout=90m $(GINKGO_REPORT)=perf.xml --label-filter="perf" ./test/e2e/
 
 test-real:
 	@mkdir -p $(REPORT_DIR)

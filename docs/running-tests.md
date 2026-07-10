@@ -9,6 +9,7 @@
 | `make test-mutating` | 5 specs | Same + backup/restore permission | Yes (reverts) |
 | `make test-real` | 7 specs | Same + `config/lab.yaml` with real second vCenter already applied | Reads only |
 | `make test-csi-operator` | CSI FD lifecycle + topology + orphan specs | Same + `config/lab.yaml` with `failureDomain` | Yes (reverts) |
+| `make test-perf` | 1 spec (PERF-01) | KUBECONFIG, at least 1 MachineSet; `PERF_WORKER_COUNT` env (default 64) | Yes — creates/deletes MachineSet |
 | `make test-csi-topology` | 6 specs (TOPO-01–06) | KUBECONFIG, gate enabled, 2+ vCenters/FDs | Yes — TOPO-06 only (reverts) |
 | `make test-csi-orphan` | 6 specs (SYNTH-01/02/04/05/09/10) | Same + `config/lab.yaml`, `make apply-lab` already run | Yes (reverts) |
 | `make day2-lab` | apply → test-real → restore | Same + `config/lab.yaml` + second vCenter reachable | Yes (reverts) |
@@ -117,6 +118,23 @@ Deletes `openshift-config-managed/kube-cloud-config` and waits for `config-opera
 | SYNTH-01/02/04/05/09/10 | `config/lab.yaml` with `failureDomain` set; `make apply-lab` already run so the cluster tag/category exist on the second vCenter; a non-FD datastore on the second vCenter — set `orphanTest.datastore` explicitly, or rely on auto-discovery via `FindNonFDDatastore` (Skips if none found) |
 
 PV-blocked orphan tests (SYNTH-06/07/08) are deferred pending a MachineSet-on-local-disk-host lab checklist — see `plans/new-csi-operator-test-topology-config.md`.
+
+### Provisioning Performance Benchmark
+
+| Test | Requires |
+|---|---|
+| PERF-01 | At least one worker MachineSet to clone. vSphere environment must have capacity for `PERF_WORKER_COUNT` additional VMs (CPU, memory, storage, IPs). Default is 64 machines — use `PERF_WORKER_COUNT=2` for smoke tests. |
+
+Results are written to `PERF_RESULTS_DIR` (default `reports/`) as `perf-results.json`. For A/B comparison, use the orchestration script:
+
+```bash
+./hack/perf-benchmark.sh \
+    --baseline-image quay.io/openshift-release-dev/ocp-release:4.18.0 \
+    --pr-image quay.io/your-repo/ocp-release:4.18.0-mao-1515 \
+    --worker-count 64
+```
+
+This installs two clusters serially, runs the benchmark on each, and produces a comparison report via `go run ./cmd/perf-compare`.
 
 ### Real vCenter Tests
 

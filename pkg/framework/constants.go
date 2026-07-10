@@ -64,4 +64,6 @@ DefaultTimeout = 5 * time.Minute
 	ShortTimeout   = 30 * time.Second
 	LongTimeout    = 15 * time.Minute
 	OperatorSyncTimeout = 12 * time.Minute
+
+	PerfTimeout = 60 * time.Minute
 )

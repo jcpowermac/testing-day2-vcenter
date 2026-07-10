@@ -15,6 +15,7 @@ make test-storage-readonly # storage tests that don't provision PVCs
 make test-csi-operator    # run CSI operator FD lifecycle tests (needs lab config)
 make test-csi-topology    # run CSI ClusterCSIDriver topology config tests (TOPO-01–06, no lab config needed)
 make test-csi-orphan      # run CSI synthetic orphan tag tests (SYNTH-*, needs lab config + apply-lab already run)
+make test-perf            # run provisioning performance benchmark (mutating, creates 64 machines)
 make test-real            # run tests requiring a real second vCenter (needs config/lab.yaml)
 make test-e2e             # full end-to-end: baseline → apply → verify → all tests → restore
 make apply-lab            # add second vCenter to cluster using lab config
@@ -94,6 +95,7 @@ plans/                  Test plan documents
 - `csi-operator` — CSI operator FD lifecycle tests (tag cleanup, SPBM, PV safety); also covers `csi-topology` and `csi-orphan`
 - `csi-topology` — ClusterCSIDriver topology config + Infrastructure precedence tests (TOPO-*)
 - `csi-orphan` — synthetic orphan tag tests via direct datastore tagging, second vCenter only (SYNTH-*)
+- `perf` — provisioning performance benchmark (creates a temporary MachineSet, scales to N machines, records timing)
 - `real-vcenter` — requires lab config with real second vCenter
 
 ## Known Issues

@@ -435,3 +435,168 @@ func joinVSpherePath(parts []string) string {
 	}
 	return result
 }
+
+
+// MachineTimingRecord holds per-machine phase transition timestamps.
+type MachineTimingRecord struct {
+	Name         string    `json:"name"`
+	Created      time.Time `json:"created"`
+	Provisioning time.Time `json:"provisioning"`
+	Provisioned  time.Time `json:"provisioned"`
+	Running      time.Time `json:"running"`
+}
+
+// PerfBenchmarkResult holds the full benchmark output.
+type PerfBenchmarkResult struct {
+	ScaleRequestTime time.Time             `json:"scaleRequestTime"`
+	AllRunningTime   time.Time             `json:"allRunningTime"`
+	TargetCount      int                   `json:"targetCount"`
+	TotalDuration    string                `json:"totalDuration"`
+	Machines         []MachineTimingRecord `json:"machines"`
+}
+
+// CloneMachineSetSameSpec clones a MachineSet preserving the source's provider
+// spec and region/zone labels but with a new name and replicas=0.
+func CloneMachineSetSameSpec(source machinev1beta1.MachineSet, newName string) *machinev1beta1.MachineSet {
+	region := ""
+	zone := ""
+	if source.Spec.Template.Labels != nil {
+		region = source.Spec.Template.Labels[MachineRegionLabel]
+		zone = source.Spec.Template.Labels[MachineZoneLabel]
+	}
+
+	replicas := int32(0)
+	ms := &machinev1beta1.MachineSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      newName,
+			Namespace: source.Namespace,
+			Labels: map[string]string{
+				MachineRegionLabel: region,
+				MachineZoneLabel:   zone,
+			},
+		},
+		Spec: machinev1beta1.MachineSetSpec{
+			Replicas: &replicas,
+			Selector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"machine.openshift.io/cluster-api-machineset": newName,
+				},
+			},
+			Template: machinev1beta1.MachineTemplateSpec{
+				ObjectMeta: machinev1beta1.ObjectMeta{
+					Labels: map[string]string{
+						"machine.openshift.io/cluster-api-machineset": newName,
+						MachineRegionLabel: region,
+						MachineZoneLabel:   zone,
+					},
+				},
+				Spec: machinev1beta1.MachineSpec{
+					ProviderSpec: source.Spec.Template.Spec.ProviderSpec,
+				},
+			},
+		},
+	}
+	return ms
+}
+
+// WatchMachinePhaseTimestamps polls machines belonging to a MachineSet and records
+// the wall-clock time at which each machine first reaches each phase. Returns when
+// targetCount machines have reached Running.
+func WatchMachinePhaseTimestamps(ctx context.Context, client machineclient.Interface, msName string, targetCount int, timeout time.Duration) (*PerfBenchmarkResult, error) {
+	records := make(map[string]*MachineTimingRecord)
+	lastLog := time.Now()
+
+	var lastErr error
+	pollErr := wait.PollUntilContextTimeout(ctx, DefaultPolling, timeout, true, func(ctx context.Context) (bool, error) {
+		machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+			LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+		})
+		if err != nil {
+			lastErr = err
+			return false, nil
+		}
+
+		now := time.Now()
+		runningCount := 0
+		provisioningCount := 0
+		provisionedCount := 0
+
+		for _, m := range machines.Items {
+			if m.DeletionTimestamp != nil {
+				continue
+			}
+
+			rec, exists := records[m.Name]
+			if !exists {
+				rec = &MachineTimingRecord{
+					Name:    m.Name,
+					Created: m.CreationTimestamp.Time,
+				}
+				records[m.Name] = rec
+			}
+
+			phase := ""
+			if m.Status.Phase != nil {
+				phase = *m.Status.Phase
+			}
+
+			switch phase {
+			case "Provisioning":
+				if rec.Provisioning.IsZero() {
+					rec.Provisioning = now
+				}
+				provisioningCount++
+			case "Provisioned":
+				if rec.Provisioning.IsZero() {
+					rec.Provisioning = now
+				}
+				if rec.Provisioned.IsZero() {
+					rec.Provisioned = now
+				}
+				provisionedCount++
+			case "Running":
+				if rec.Provisioning.IsZero() {
+					rec.Provisioning = now
+				}
+				if rec.Provisioned.IsZero() {
+					rec.Provisioned = now
+				}
+				if rec.Running.IsZero() {
+					rec.Running = now
+				}
+				runningCount++
+			}
+		}
+
+		if time.Since(lastLog) >= 30*time.Second {
+			fmt.Printf("  perf-watch: %d/%d Running, %d Provisioned, %d Provisioning, %d total machines\n",
+				runningCount, targetCount, provisionedCount, provisioningCount, len(machines.Items))
+			lastLog = now
+		}
+
+		lastErr = nil
+		if runningCount >= targetCount {
+			return true, nil
+		}
+		lastErr = fmt.Errorf("%d/%d machines Running", runningCount, targetCount)
+		return false, nil
+	})
+
+	result := &PerfBenchmarkResult{
+		TargetCount: targetCount,
+	}
+	for _, rec := range records {
+		result.Machines = append(result.Machines, *rec)
+		if !rec.Running.IsZero() && rec.Running.After(result.AllRunningTime) {
+			result.AllRunningTime = rec.Running
+		}
+	}
+
+	if pollErr != nil {
+		if lastErr != nil {
+			return result, fmt.Errorf("%w: %v", pollErr, lastErr)
+		}
+		return result, pollErr
+	}
+	return result, nil
+}
