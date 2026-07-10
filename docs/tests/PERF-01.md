@@ -15,16 +15,17 @@ short-circuiting reconciliation of stable machines.
 
 ## Actions
 
-1. Read `PERF_WORKER_COUNT` (default 64) and `PERF_RESULTS_DIR` (default `reports`)
+1. Read `PERF_WORKER_COUNT` (default 64), `PERF_RESULTS_DIR` (default `reports`), `PERF_STEADY_STATE_SECONDS` (default 300)
 2. Clone the first existing worker MachineSet with replicas=0, named `perf-bench-<hex>`
 3. Create the MachineSet, register cleanup
 4. Record t0, scale to target replica count
 5. Poll machines and record the first wall-clock time each machine reaches Provisioning, Provisioned, and Running
 6. Wait for all new nodes to reach Ready
-7. Best-effort scrape of MAO metrics via Thanos
-8. Print summary table with per-machine timing, p50/p90/p99 latency, and throughput
-9. Write structured `perf-results.json` to results directory
-10. Cleanup: scale to 0, drain, force-delete on timeout, delete MachineSet
+7. Steady-state observation: snapshot `controller_runtime_reconcile_total` and `workqueue_adds_total` from Thanos, snapshot Machine resourceVersions, wait for the observation window, snapshot again, compute deltas
+8. Best-effort scrape of MAO metrics via Thanos
+9. Print summary table with per-machine timing, p50/p90/p99 latency, throughput, and steady-state reconciliation metrics
+10. Write structured `perf-results.json` to results directory (includes `steadyState` section)
+11. Cleanup: scale to 0, drain, force-delete on timeout, delete MachineSet
 
 ## Code
 

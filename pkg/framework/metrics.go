@@ -19,6 +19,40 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// QueryPromQL executes an arbitrary PromQL instant query against the cluster's
+// Thanos endpoint and returns the result in Prometheus text exposition format
+// compatible with ParseMetricValue.
+func QueryPromQL(ctx context.Context, client kubernetes.Interface, query string) (string, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		cfg, err = loadRestConfig()
+		if err != nil {
+			return "", fmt.Errorf("query promql: build rest config: %w", err)
+		}
+	}
+
+	thanosHost, err := thanosQuerierHost(ctx, cfg)
+	if err != nil {
+		return "", fmt.Errorf("query promql: %w", err)
+	}
+
+	token, err := prometheusToken(ctx, client)
+	if err != nil {
+		return "", fmt.Errorf("query promql: %w", err)
+	}
+
+	raw, err := queryThanos(ctx, thanosHost, token, query)
+	if err != nil {
+		return "", fmt.Errorf("query promql: %w", err)
+	}
+
+	text, err := vectorToText(raw)
+	if err != nil {
+		return "", fmt.Errorf("query promql: %w", err)
+	}
+	return text, nil
+}
+
 // ScrapeOperatorMetrics queries the cluster's Thanos endpoint for all metrics
 // emitted by the operator and returns them in Prometheus text exposition format
 // so that ParseMetricValue continues to work unchanged.

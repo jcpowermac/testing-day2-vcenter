@@ -23,17 +23,29 @@ type PerfBenchmarkResult struct {
 	TargetCount      int                   `json:"targetCount"`
 	TotalDuration    string                `json:"totalDuration"`
 	Machines         []MachineTimingRecord `json:"machines"`
+	SteadyState      *SteadyStateResult    `json:"steadyState,omitempty"`
+}
+
+type SteadyStateResult struct {
+	WindowDuration        string  `json:"windowDuration"`
+	ReconcileDelta        float64 `json:"reconcileDelta"`
+	ReconcileRate         float64 `json:"reconcileRate"`
+	QueueAddsDelta        float64 `json:"queueAddsDelta"`
+	QueueDepthEnd         float64 `json:"queueDepthEnd"`
+	ResourceVersionDeltas int     `json:"resourceVersionDeltas"`
+	MachineCount          int     `json:"machineCount"`
 }
 
 type stats struct {
-	totalTime              time.Duration
-	throughput             float64
-	machineCount           int
-	totalP50, totalP90     time.Duration
-	totalP99               time.Duration
-	pendingToProvisionP50  time.Duration
-	provisionToReadyP50    time.Duration
+	totalTime               time.Duration
+	throughput              float64
+	machineCount            int
+	totalP50, totalP90      time.Duration
+	totalP99                time.Duration
+	pendingToProvisionP50   time.Duration
+	provisionToReadyP50     time.Duration
 	provisionedToRunningP50 time.Duration
+	steadyState             *SteadyStateResult
 }
 
 func main() {
@@ -136,6 +148,7 @@ func computeStats(r *PerfBenchmarkResult) stats {
 	if len(provisionedToRunning) > 0 {
 		s.provisionedToRunningP50 = percentile(provisionedToRunning, 0.50)
 	}
+	s.steadyState = r.SteadyState
 	return s
 }
 
@@ -162,6 +175,32 @@ func formatComparison(base, pr stats) string {
 	out += "\n"
 
 	out += fmt.Sprintf("%-32s %14d %14d\n", "Machines provisioned", base.machineCount, pr.machineCount)
+
+	if base.steadyState != nil || pr.steadyState != nil {
+		out += "\n"
+		bss := base.steadyState
+		pss := pr.steadyState
+		if bss == nil {
+			bss = &SteadyStateResult{}
+		}
+		if pss == nil {
+			pss = &SteadyStateResult{}
+		}
+		window := bss.WindowDuration
+		if window == "" {
+			window = pss.WindowDuration
+		}
+		out += fmt.Sprintf("Steady-state (%s window):\n", window)
+		out += fmtRowFloat("  Reconcile delta", bss.ReconcileDelta, pss.ReconcileDelta)
+		out += fmtRowFloat("  Reconcile rate (/min)", bss.ReconcileRate, pss.ReconcileRate)
+		out += fmtRowFloat("  Queue adds delta", bss.QueueAddsDelta, pss.QueueAddsDelta)
+		out += fmtRowFloat("  Queue depth at end", bss.QueueDepthEnd, pss.QueueDepthEnd)
+		out += fmt.Sprintf("%-32s %10d/%-4d %10d/%-4d\n",
+			"  Machine RV changes",
+			bss.ResourceVersionDeltas, bss.MachineCount,
+			pss.ResourceVersionDeltas, pss.MachineCount)
+	}
+
 	return out
 }
 

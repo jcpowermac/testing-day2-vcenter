@@ -100,6 +100,61 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 			Expect(framework.WaitForAllNodesReady(ctx, clients.Kube, framework.PerfTimeout)).To(Succeed(),
 				"all nodes should become Ready")
 
+			steadyStateSeconds := 300
+			if ssStr := os.Getenv("PERF_STEADY_STATE_SECONDS"); ssStr != "" {
+				steadyStateSeconds, err = strconv.Atoi(ssStr)
+				Expect(err).NotTo(HaveOccurred(), "PERF_STEADY_STATE_SECONDS must be a valid integer")
+				Expect(steadyStateSeconds).To(BeNumerically(">", 0))
+			}
+			steadyStateDuration := time.Duration(steadyStateSeconds) * time.Second
+
+			By("observing steady-state reconciliation")
+			beforeReconciles := queryMetricOrZero(ctx,
+				`controller_runtime_reconcile_total{controller="machine-controller"}`,
+				"controller_runtime_reconcile_total", nil)
+			beforeQueueAdds := queryMetricOrZero(ctx,
+				`workqueue_adds_total{name="machine-controller"}`,
+				"workqueue_adds_total", nil)
+
+			rvBefore, err := framework.SnapshotMachineResourceVersions(ctx, clients.Machine, msName)
+			Expect(err).NotTo(HaveOccurred(), "snapshot machine resourceVersions before steady-state")
+
+			GinkgoWriter.Printf("steady-state observation: waiting %s with %d Running machines\n",
+				steadyStateDuration, workerCount)
+			select {
+			case <-time.After(steadyStateDuration):
+			case <-ctx.Done():
+				Fail("context cancelled during steady-state observation")
+			}
+
+			afterReconciles := queryMetricOrZero(ctx,
+				`controller_runtime_reconcile_total{controller="machine-controller"}`,
+				"controller_runtime_reconcile_total", nil)
+			afterQueueAdds := queryMetricOrZero(ctx,
+				`workqueue_adds_total{name="machine-controller"}`,
+				"workqueue_adds_total", nil)
+			queueDepth := queryMetricOrZero(ctx,
+				`workqueue_depth{name="machine-controller"}`,
+				"workqueue_depth", nil)
+
+			rvAfter, err := framework.SnapshotMachineResourceVersions(ctx, clients.Machine, msName)
+			Expect(err).NotTo(HaveOccurred(), "snapshot machine resourceVersions after steady-state")
+
+			reconcileDelta := afterReconciles - beforeReconciles
+			queueAddsDelta := afterQueueAdds - beforeQueueAdds
+			rvChanges := framework.CountResourceVersionChanges(rvBefore, rvAfter)
+			reconcileRate := reconcileDelta / (float64(steadyStateSeconds) / 60.0)
+
+			result.SteadyState = &framework.SteadyStateResult{
+				WindowDuration:        steadyStateDuration.String(),
+				ReconcileDelta:        reconcileDelta,
+				ReconcileRate:         reconcileRate,
+				QueueAddsDelta:        queueAddsDelta,
+				QueueDepthEnd:         queueDepth,
+				ResourceVersionDeltas: rvChanges,
+				MachineCount:          len(rvBefore),
+			}
+
 			metrics, err := framework.ScrapeOperatorMetrics(ctx, clients.Kube,
 				framework.MachineAPINamespace, "api=clusterapi,k8s-app=controller-manager")
 			if err == nil {
@@ -109,6 +164,7 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 			}
 
 			printPerfSummary(result)
+			printSteadyStateSummary(result.SteadyState)
 
 			Expect(os.MkdirAll(resultsDir, 0o755)).To(Succeed())
 			outPath := filepath.Join(resultsDir, "perf-results.json")
@@ -225,4 +281,30 @@ func truncateName(name string, max int) string {
 		return name
 	}
 	return name[:max-3] + "..."
+}
+
+func queryMetricOrZero(ctx SpecContext, query, metricName string, labels map[string]string) float64 {
+	text, err := framework.QueryPromQL(ctx, clients.Kube, query)
+	if err != nil {
+		GinkgoWriter.Printf("warning: query %q failed: %v\n", query, err)
+		return 0
+	}
+	val, err := framework.ParseMetricValue(text, metricName, labels)
+	if err != nil {
+		GinkgoWriter.Printf("warning: parse %q from query %q: %v\n", metricName, query, err)
+		return 0
+	}
+	return val
+}
+
+func printSteadyStateSummary(ss *framework.SteadyStateResult) {
+	if ss == nil {
+		return
+	}
+	GinkgoWriter.Printf("\n=== Steady-State Observation ===\n")
+	GinkgoWriter.Printf("Window:                  %s\n", ss.WindowDuration)
+	GinkgoWriter.Printf("Reconcile delta:         %.0f  (%.1f/min)\n", ss.ReconcileDelta, ss.ReconcileRate)
+	GinkgoWriter.Printf("Queue adds delta:        %.0f\n", ss.QueueAddsDelta)
+	GinkgoWriter.Printf("Queue depth at end:      %.0f\n", ss.QueueDepthEnd)
+	GinkgoWriter.Printf("Machine RV changes:      %d/%d\n", ss.ResourceVersionDeltas, ss.MachineCount)
 }

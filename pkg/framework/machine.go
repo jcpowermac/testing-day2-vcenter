@@ -456,6 +456,18 @@ type PerfBenchmarkResult struct {
 	TargetCount      int                   `json:"targetCount"`
 	TotalDuration    string                `json:"totalDuration"`
 	Machines         []MachineTimingRecord `json:"machines"`
+	SteadyState      *SteadyStateResult    `json:"steadyState,omitempty"`
+}
+
+// SteadyStateResult holds metrics from a post-provisioning observation window.
+type SteadyStateResult struct {
+	WindowDuration        string  `json:"windowDuration"`
+	ReconcileDelta        float64 `json:"reconcileDelta"`
+	ReconcileRate         float64 `json:"reconcileRate"`
+	QueueAddsDelta        float64 `json:"queueAddsDelta"`
+	QueueDepthEnd         float64 `json:"queueDepthEnd"`
+	ResourceVersionDeltas int     `json:"resourceVersionDeltas"`
+	MachineCount          int     `json:"machineCount"`
 }
 
 // CloneMachineSetSameSpec clones a MachineSet preserving the source's provider
@@ -602,4 +614,34 @@ func WatchMachinePhaseTimestamps(ctx context.Context, client machineclient.Inter
 		return result, pollErr
 	}
 	return result, nil
+}
+
+// SnapshotMachineResourceVersions returns a map of machine name to
+// resourceVersion for all non-deleting machines in the given MachineSet.
+func SnapshotMachineResourceVersions(ctx context.Context, client machineclient.Interface, msName string) (map[string]string, error) {
+	machines, err := client.MachineV1beta1().Machines(MachineAPINamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "machine.openshift.io/cluster-api-machineset=" + msName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]string, len(machines.Items))
+	for _, m := range machines.Items {
+		if m.DeletionTimestamp == nil {
+			result[m.Name] = m.ResourceVersion
+		}
+	}
+	return result, nil
+}
+
+// CountResourceVersionChanges compares two resourceVersion snapshots
+// and returns the count of machines whose resourceVersion changed.
+func CountResourceVersionChanges(before, after map[string]string) int {
+	changed := 0
+	for name, rv := range before {
+		if afterRV, ok := after[name]; ok && afterRV != rv {
+			changed++
+		}
+	}
+	return changed
 }
