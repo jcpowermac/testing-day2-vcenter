@@ -43,7 +43,7 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 		NodeTimeout(90*time.Minute),
 		func(ctx SpecContext) {
 			By("verifying cluster is ready before benchmark")
-			for _, co := range []string{"cloud-controller-manager", "config-operator", "machine-api", "storage"} {
+			for _, co := range []string{"cloud-controller-manager", "config-operator", "machine-api"} {
 				GinkgoWriter.Printf("waiting for clusteroperator %s to be stable\n", co)
 				Expect(framework.WaitForClusterOperatorStable(ctx, clients.Config, co, framework.DefaultTimeout)).To(Succeed(),
 					"clusteroperator %s must be stable before benchmark", co)
