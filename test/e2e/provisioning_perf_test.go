@@ -118,7 +118,7 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 				GinkgoWriter.Printf("WARNING: not all nodes became Ready: %v — continuing\n", err)
 			}
 
-			steadyStateSeconds := 300
+			steadyStateSeconds := 720
 			if ssStr := os.Getenv("PERF_STEADY_STATE_SECONDS"); ssStr != "" {
 				var parseErr error
 				steadyStateSeconds, parseErr = strconv.Atoi(ssStr)

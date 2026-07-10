@@ -123,7 +123,7 @@ PV-blocked orphan tests (SYNTH-06/07/08) are deferred pending a MachineSet-on-lo
 
 | Test | Requires |
 |---|---|
-| PERF-01 | At least one worker MachineSet to clone. vSphere environment must have capacity for `PERF_WORKER_COUNT` additional VMs (CPU, memory, storage, IPs). Default is 64 machines — use `PERF_WORKER_COUNT=2` for smoke tests. `PERF_STEADY_STATE_SECONDS` (default 300) controls the post-provisioning observation window for reconciler metrics. |
+| PERF-01 | At least one worker MachineSet to clone. vSphere environment must have capacity for `PERF_WORKER_COUNT` additional VMs (CPU, memory, storage, IPs). Default is 64 machines — use `PERF_WORKER_COUNT=2` for smoke tests. `PERF_STEADY_STATE_SECONDS` (default 720) controls the post-provisioning observation window for reconciler metrics. |
 
 Results are written to `PERF_RESULTS_DIR` (default `reports/`) as `perf-results.json`. For A/B comparison, use the orchestration script:
 

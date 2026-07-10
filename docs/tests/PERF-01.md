@@ -15,7 +15,7 @@ short-circuiting reconciliation of stable machines.
 
 ## Actions
 
-1. Read `PERF_WORKER_COUNT` (default 64), `PERF_RESULTS_DIR` (default `reports`), `PERF_STEADY_STATE_SECONDS` (default 300)
+1. Read `PERF_WORKER_COUNT` (default 64), `PERF_RESULTS_DIR` (default `reports`), `PERF_STEADY_STATE_SECONDS` (default 720)
 2. Clone the first existing worker MachineSet with replicas=0, named `perf-bench-<hex>`
 3. Create the MachineSet, register cleanup
 4. Record t0, scale to target replica count
