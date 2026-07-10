@@ -48,8 +48,12 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 			msName = fmt.Sprintf("perf-bench-%s", perfRandomSuffix())
 			source := sets[0]
 			ms := framework.CloneMachineSetSameSpec(source, msName)
+			replicas := int32(workerCount)
+			ms.Spec.Replicas = &replicas
 
-			GinkgoWriter.Printf("creating benchmark MachineSet %s (cloned from %s) with replicas=0\n", msName, source.Name)
+			t0 := time.Now()
+			GinkgoWriter.Printf("creating benchmark MachineSet %s (cloned from %s) with replicas=%d at %s\n",
+				msName, source.Name, workerCount, t0.Format(time.RFC3339))
 			_, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
 			Expect(err).NotTo(HaveOccurred(), "create benchmark MachineSet")
 
@@ -68,10 +72,6 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 				_ = framework.DeleteMachineSet(ctx, clients.Machine, msName)
 				GinkgoWriter.Printf("cleanup: MachineSet %s deleted\n", msName)
 			})
-
-			t0 := time.Now()
-			GinkgoWriter.Printf("scaling MachineSet %s to %d replicas at %s\n", msName, workerCount, t0.Format(time.RFC3339))
-			Expect(framework.ScaleMachineSet(ctx, clients.Machine, msName, int32(workerCount))).To(Succeed())
 
 			result, err := framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, msName, workerCount, framework.PerfTimeout)
 			Expect(err).NotTo(HaveOccurred(), "all machines should reach Running within timeout")
