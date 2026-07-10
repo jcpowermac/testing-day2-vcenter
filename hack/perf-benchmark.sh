@@ -19,6 +19,7 @@ INSTALL_DIR="$HOME/before-installer-testing/vsphere-ipi"
 INSTALL_CONFIG_TEMPLATE="install-config-backup-dev.yaml"
 RESULTS_DIR="$TEST_REPO/results/perf"
 WORKER_COUNT=64
+FORCE=false
 
 usage() {
     cat <<EOF
@@ -33,6 +34,7 @@ Options:
                             (default: install-config-backup-dev.yaml).
   --results-dir <path>      Where to store results (default: <repo>/results/perf).
   --worker-count <n>        Number of machines to provision in benchmark (default: 64).
+  --force                   Re-run even if results already exist (disables resume).
   -h, --help                Show this help.
 EOF
     exit 1
@@ -46,6 +48,7 @@ while [[ $# -gt 0 ]]; do
         --install-config)  INSTALL_CONFIG_TEMPLATE="$2"; shift 2 ;;
         --results-dir)     RESULTS_DIR="$2"; shift 2 ;;
         --worker-count)    WORKER_COUNT="$2"; shift 2 ;;
+        --force)           FORCE=true; shift ;;
         -h|--help)         usage ;;
         *)                 echo "Unknown option: $1"; usage ;;
     esac
@@ -94,8 +97,8 @@ run_benchmark() {
     mkdir -p "$variant_dir"
 
     # Resume support: skip if this variant already has perf-results.json
-    if [[ -f "$variant_dir/perf-results.json" ]]; then
-        log "=== $variant: already has results, skipping ==="
+    if [[ "$FORCE" != "true" ]] && [[ -f "$variant_dir/perf-results.json" ]]; then
+        log "=== $variant: already has results, skipping (use --force to re-run) ==="
         return 0
     fi
 
