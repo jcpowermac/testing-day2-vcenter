@@ -75,6 +75,10 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 				if msName == "" {
 					return
 				}
+				GinkgoWriter.Printf("cleanup: releasing DHCP leases before scale-down\n")
+				if err := framework.ReleaseDHCPLeases(ctx, clients.Kube, clients.Machine, msName, GinkgoWriter.Printf); err != nil {
+					GinkgoWriter.Printf("cleanup: DHCP release failed (best-effort): %v\n", err)
+				}
 				GinkgoWriter.Printf("cleanup: scaling MachineSet %s to 0\n", msName)
 				_ = framework.ScaleMachineSet(ctx, clients.Machine, msName, 0)
 				err := framework.WaitForMachineSetDrainedWithLog(ctx, clients.Machine, msName, 20*time.Minute)
