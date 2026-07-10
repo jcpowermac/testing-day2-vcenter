@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 )
 
 // ExtractVSphereMachineProviderSpec unmarshals the raw providerSpec from a Machine.
@@ -94,13 +95,15 @@ func CloneMachineSetForVAP(source machinev1beta1.MachineSet, name, region, zone 
 
 // ScaleMachineSet sets the replica count on a MachineSet.
 func ScaleMachineSet(ctx context.Context, client machineclient.Interface, name string, replicas int32) error {
-	ms, err := client.MachineV1beta1().MachineSets(MachineAPINamespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("get machineset %s: %w", name, err)
-	}
-	ms.Spec.Replicas = &replicas
-	_, err = client.MachineV1beta1().MachineSets(MachineAPINamespace).Update(ctx, ms, metav1.UpdateOptions{})
-	return err
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		ms, err := client.MachineV1beta1().MachineSets(MachineAPINamespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("get machineset %s: %w", name, err)
+		}
+		ms.Spec.Replicas = &replicas
+		_, err = client.MachineV1beta1().MachineSets(MachineAPINamespace).Update(ctx, ms, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 // WaitForMachineSetMachines waits until the MachineSet has at least `count`

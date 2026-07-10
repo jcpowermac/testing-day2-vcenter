@@ -42,6 +42,20 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 	It("PERF-01: should provision N machines and record per-machine timing",
 		NodeTimeout(90*time.Minute),
 		func(ctx SpecContext) {
+			By("verifying cluster is ready before benchmark")
+			for _, co := range []string{"cloud-controller-manager", "config-operator", "machine-api", "storage"} {
+				GinkgoWriter.Printf("waiting for clusteroperator %s to be stable\n", co)
+				Expect(framework.WaitForClusterOperatorStable(ctx, clients.Config, co, framework.DefaultTimeout)).To(Succeed(),
+					"clusteroperator %s must be stable before benchmark", co)
+			}
+			GinkgoWriter.Printf("waiting for all existing machines to be healthy\n")
+			Expect(framework.WaitForAllMachinesHealthy(ctx, clients.Machine, framework.DefaultTimeout)).To(Succeed(),
+				"all existing machines must be Running before benchmark")
+			GinkgoWriter.Printf("waiting for all existing nodes to be ready\n")
+			Expect(framework.WaitForAllNodesReady(ctx, clients.Kube, framework.DefaultTimeout)).To(Succeed(),
+				"all existing nodes must be Ready before benchmark")
+			GinkgoWriter.Printf("cluster ready, starting benchmark\n")
+
 			sets := listMachineSets()
 			Expect(sets).NotTo(BeEmpty(), "cluster must have at least one MachineSet")
 
