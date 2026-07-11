@@ -182,11 +182,11 @@ run_benchmark() {
     return $run_rc
 }
 
+# --- Run PR first (fresh cluster, no prior workload residue) ---
+run_benchmark "pr" "$PR_IMAGE" || OVERALL_RC=1
+
 # --- Run baseline ---
 run_benchmark "baseline" "$BASELINE_IMAGE" || OVERALL_RC=1
-
-# --- Run PR ---
-run_benchmark "pr" "$PR_IMAGE" || OVERALL_RC=1
 
 # --- Generate comparison ---
 BASELINE_JSON="$RESULTS_DIR/baseline/perf-results.json"
