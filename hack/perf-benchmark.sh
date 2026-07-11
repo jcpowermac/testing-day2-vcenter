@@ -131,6 +131,11 @@ run_benchmark() {
         return 1
     fi
 
+    # Drop an NM connection profile for ens192 with ipv6.method=disabled.
+    # configure-ovs.sh copies ipv6.method from the source connection when
+    # creating ovs-if-br-ex, and explicitly sets ipv6.may-fail=no. A conf.d
+    # default is overridden by those explicit args; the only way to propagate
+    # disabled is to set it on the source connection that the script reads.
     cat > openshift/99-worker-disable-ipv6.yaml <<'MCEOF'
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -145,9 +150,9 @@ spec:
     storage:
       files:
         - contents:
-            source: data:text/plain;charset=utf-8;base64,W2Nvbm5lY3Rpb25dCmlwdjYubWV0aG9kPWRpc2FibGVkCg==
-          mode: 0644
-          path: /etc/NetworkManager/conf.d/99-disable-ipv6.conf
+            source: data:text/plain;charset=utf-8;base64,W2Nvbm5lY3Rpb25dCmlkPWVuczE5Mgp0eXBlPWV0aGVybmV0CmludGVyZmFjZS1uYW1lPWVuczE5MgphdXRvY29ubmVjdD10cnVlCmF1dG9jb25uZWN0LXByaW9yaXR5PTk5OQoKW2lwdjRdCm1ldGhvZD1hdXRvCgpbaXB2Nl0KbWV0aG9kPWRpc2FibGVkCg==
+          mode: 0600
+          path: /etc/NetworkManager/system-connections/ens192.nmconnection
 MCEOF
     log "$variant: injected IPv6-disable MachineConfig for workers"
 
