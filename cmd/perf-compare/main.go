@@ -18,12 +18,13 @@ type MachineTimingRecord struct {
 }
 
 type PerfBenchmarkResult struct {
-	ScaleRequestTime time.Time             `json:"scaleRequestTime"`
-	AllRunningTime   time.Time             `json:"allRunningTime"`
-	TargetCount      int                   `json:"targetCount"`
-	TotalDuration    string                `json:"totalDuration"`
-	Machines         []MachineTimingRecord `json:"machines"`
-	SteadyState      *SteadyStateResult    `json:"steadyState,omitempty"`
+	ScaleRequestTime  time.Time                `json:"scaleRequestTime"`
+	AllRunningTime    time.Time                `json:"allRunningTime"`
+	TargetCount       int                      `json:"targetCount"`
+	TotalDuration     string                   `json:"totalDuration"`
+	Machines          []MachineTimingRecord    `json:"machines"`
+	SteadyState       *SteadyStateResult       `json:"steadyState,omitempty"`
+	NewMachineLatency *NewMachineLatencyResult `json:"newMachineLatency,omitempty"`
 }
 
 type SteadyStateResult struct {
@@ -36,6 +37,13 @@ type SteadyStateResult struct {
 	MachineCount          int     `json:"machineCount"`
 }
 
+type NewMachineLatencyResult struct {
+	BackgroundMachines int                   `json:"backgroundMachines"`
+	NewMachineCount    int                   `json:"newMachineCount"`
+	TotalDuration      string                `json:"totalDuration"`
+	Machines           []MachineTimingRecord `json:"machines"`
+}
+
 type stats struct {
 	totalTime               time.Duration
 	throughput              float64
@@ -46,6 +54,16 @@ type stats struct {
 	provisionToReadyP50     time.Duration
 	provisionedToRunningP50 time.Duration
 	steadyState             *SteadyStateResult
+	newML                   *newMLStats
+}
+
+type newMLStats struct {
+	backgroundMachines      int
+	newMachineCount         int
+	pendingToProvisionP50   time.Duration
+	provisionToReadyP50     time.Duration
+	provisionedToRunningP50 time.Duration
+	totalP50                time.Duration
 }
 
 func main() {
@@ -149,6 +167,54 @@ func computeStats(r *PerfBenchmarkResult) stats {
 		s.provisionedToRunningP50 = percentile(provisionedToRunning, 0.50)
 	}
 	s.steadyState = r.SteadyState
+
+	if r.NewMachineLatency != nil {
+		s.newML = computeNewMLStats(r.NewMachineLatency)
+	}
+
+	return s
+}
+
+func computeNewMLStats(nml *NewMachineLatencyResult) *newMLStats {
+	var totals []time.Duration
+	var pendingToProvisioning []time.Duration
+	var provisioningToProvisioned []time.Duration
+	var provisionedToRunning []time.Duration
+
+	for _, m := range nml.Machines {
+		if m.Running.IsZero() {
+			continue
+		}
+		totals = append(totals, m.Running.Sub(m.Created))
+		if !m.Provisioning.IsZero() {
+			pendingToProvisioning = append(pendingToProvisioning, m.Provisioning.Sub(m.Created))
+		}
+		if !m.Provisioning.IsZero() && !m.Provisioned.IsZero() {
+			provisioningToProvisioned = append(provisioningToProvisioned, m.Provisioned.Sub(m.Provisioning))
+		}
+		if !m.Provisioned.IsZero() {
+			provisionedToRunning = append(provisionedToRunning, m.Running.Sub(m.Provisioned))
+		}
+	}
+
+	if len(totals) == 0 {
+		return nil
+	}
+
+	s := &newMLStats{
+		backgroundMachines: nml.BackgroundMachines,
+		newMachineCount:    nml.NewMachineCount,
+		totalP50:           percentile(totals, 0.50),
+	}
+	if len(pendingToProvisioning) > 0 {
+		s.pendingToProvisionP50 = percentile(pendingToProvisioning, 0.50)
+	}
+	if len(provisioningToProvisioned) > 0 {
+		s.provisionToReadyP50 = percentile(provisioningToProvisioned, 0.50)
+	}
+	if len(provisionedToRunning) > 0 {
+		s.provisionedToRunningP50 = percentile(provisionedToRunning, 0.50)
+	}
 	return s
 }
 
@@ -199,6 +265,33 @@ func formatComparison(base, pr stats) string {
 			"  Machine RV changes",
 			bss.ResourceVersionDeltas, bss.MachineCount,
 			pss.ResourceVersionDeltas, pss.MachineCount)
+	}
+
+	if base.newML != nil || pr.newML != nil {
+		out += "\n"
+		bnml := base.newML
+		pnml := pr.newML
+		if bnml == nil {
+			bnml = &newMLStats{}
+		}
+		if pnml == nil {
+			pnml = &newMLStats{}
+		}
+
+		bgCount := bnml.backgroundMachines
+		if bgCount == 0 {
+			bgCount = pnml.backgroundMachines
+		}
+		newCount := bnml.newMachineCount
+		if newCount == 0 {
+			newCount = pnml.newMachineCount
+		}
+
+		out += fmt.Sprintf("New-machine latency (%d new under %d-machine load, p50):\n", newCount, bgCount)
+		out += fmtRow("  Pending → Provisioning", bnml.pendingToProvisionP50, pnml.pendingToProvisionP50)
+		out += fmtRow("  Provisioning → Provisioned", bnml.provisionToReadyP50, pnml.provisionToReadyP50)
+		out += fmtRow("  Provisioned → Running", bnml.provisionedToRunningP50, pnml.provisionedToRunningP50)
+		out += fmtRow("  Total", bnml.totalP50, pnml.totalP50)
 	}
 
 	return out

@@ -451,12 +451,22 @@ type MachineTimingRecord struct {
 
 // PerfBenchmarkResult holds the full benchmark output.
 type PerfBenchmarkResult struct {
-	ScaleRequestTime time.Time             `json:"scaleRequestTime"`
-	AllRunningTime   time.Time             `json:"allRunningTime"`
-	TargetCount      int                   `json:"targetCount"`
-	TotalDuration    string                `json:"totalDuration"`
-	Machines         []MachineTimingRecord `json:"machines"`
-	SteadyState      *SteadyStateResult    `json:"steadyState,omitempty"`
+	ScaleRequestTime  time.Time                `json:"scaleRequestTime"`
+	AllRunningTime    time.Time                `json:"allRunningTime"`
+	TargetCount       int                      `json:"targetCount"`
+	TotalDuration     string                   `json:"totalDuration"`
+	Machines          []MachineTimingRecord    `json:"machines"`
+	SteadyState       *SteadyStateResult       `json:"steadyState,omitempty"`
+	NewMachineLatency *NewMachineLatencyResult `json:"newMachineLatency,omitempty"`
+}
+
+// NewMachineLatencyResult holds timing for new machines created while
+// existing machines are already Running (measures reconciler starvation).
+type NewMachineLatencyResult struct {
+	BackgroundMachines int                   `json:"backgroundMachines"`
+	NewMachineCount    int                   `json:"newMachineCount"`
+	TotalDuration      string                `json:"totalDuration"`
+	Machines           []MachineTimingRecord `json:"machines"`
 }
 
 // SteadyStateResult holds metrics from a post-provisioning observation window.

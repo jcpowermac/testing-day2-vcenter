@@ -15,14 +15,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating", "p1"), func() {
+var _ = Describe("Provisioning performance benchmark", Ordered, Label("perf", "mutating", "p1"), func() {
 	var (
 		msName      string
+		newMLName   string
 		workerCount int
 		resultsDir  string
+		result      *framework.PerfBenchmarkResult
+		source      string
 	)
 
-	BeforeEach(func() {
+	BeforeAll(func() {
 		wcStr := os.Getenv("PERF_WORKER_COUNT")
 		if wcStr == "" {
 			workerCount = 64
@@ -36,6 +39,15 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 		resultsDir = os.Getenv("PERF_RESULTS_DIR")
 		if resultsDir == "" {
 			resultsDir = "reports"
+		}
+	})
+
+	AfterAll(NodeTimeout(30*time.Minute), func(ctx SpecContext) {
+		for _, name := range []string{newMLName, msName} {
+			if name == "" {
+				continue
+			}
+			cleanupMachineSet(ctx, name)
 		}
 	})
 
@@ -60,36 +72,16 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 			Expect(sets).NotTo(BeEmpty(), "cluster must have at least one MachineSet")
 
 			msName = fmt.Sprintf("perf-bench-%s", perfRandomSuffix())
-			source := sets[0]
-			ms := framework.CloneMachineSetSameSpec(source, msName)
+			source = sets[0].Name
+			ms := framework.CloneMachineSetSameSpec(sets[0], msName)
 			replicas := int32(workerCount)
 			ms.Spec.Replicas = &replicas
 
 			t0 := time.Now()
 			GinkgoWriter.Printf("creating benchmark MachineSet %s (cloned from %s) with replicas=%d at %s\n",
-				msName, source.Name, workerCount, t0.Format(time.RFC3339))
+				msName, source, workerCount, t0.Format(time.RFC3339))
 			_, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
 			Expect(err).NotTo(HaveOccurred(), "create benchmark MachineSet")
-
-			DeferCleanup(NodeTimeout(30*time.Minute), func(ctx SpecContext) {
-				if msName == "" {
-					return
-				}
-				GinkgoWriter.Printf("cleanup: releasing DHCP leases before scale-down\n")
-				if err := framework.ReleaseDHCPLeases(ctx, clients.Machine, msName, GinkgoWriter.Printf); err != nil {
-					GinkgoWriter.Printf("cleanup: DHCP release failed (best-effort): %v\n", err)
-				}
-				GinkgoWriter.Printf("cleanup: scaling MachineSet %s to 0\n", msName)
-				_ = framework.ScaleMachineSet(ctx, clients.Machine, msName, 0)
-				err := framework.WaitForMachineSetDrainedWithLog(ctx, clients.Machine, msName, 20*time.Minute)
-				if err != nil {
-					GinkgoWriter.Printf("cleanup: drain failed, force-deleting machines: %v\n", err)
-					framework.ForceDeleteMachineSetMachines(ctx, clients.Machine, msName)
-					_ = framework.WaitForMachineSetDrainedWithDelete(ctx, clients.Machine, msName, 10*time.Minute)
-				}
-				_ = framework.DeleteMachineSet(ctx, clients.Machine, msName)
-				GinkgoWriter.Printf("cleanup: MachineSet %s deleted\n", msName)
-			})
 
 			result, watchErr := framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, msName, workerCount, framework.PerfTimeout)
 			Expect(result).NotTo(BeNil(), "result must be returned even on partial completion")
@@ -189,19 +181,185 @@ var _ = Describe("Provisioning performance benchmark", Label("perf", "mutating",
 			printPerfSummary(result)
 			printSteadyStateSummary(result.SteadyState)
 
-			Expect(os.MkdirAll(resultsDir, 0o755)).To(Succeed())
-			outPath := filepath.Join(resultsDir, "perf-results.json")
-			data, err := json.MarshalIndent(result, "", "  ")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(os.WriteFile(outPath, data, 0o644)).To(Succeed())
-			GinkgoWriter.Printf("perf results written to %s\n", outPath)
+			writePerfResults(resultsDir, result)
+		})
+
+	It("PERF-02: should measure new-machine latency while existing machines are Running",
+		NodeTimeout(30*time.Minute),
+		func(ctx SpecContext) {
+			if result == nil || msName == "" {
+				Skip("PERF-01 did not complete — no background machines available")
+			}
+
+			bgCount := 0
+			for _, m := range result.Machines {
+				if !m.Running.IsZero() {
+					bgCount++
+				}
+			}
+			if bgCount == 0 {
+				Skip("PERF-01 produced no Running machines — cannot test under load")
+			}
+
+			sets := listMachineSets()
+			Expect(sets).NotTo(BeEmpty(), "cluster must have at least one MachineSet")
+
+			const newMachineCount = 5
+			newMLName = fmt.Sprintf("perf-newml-%s", perfRandomSuffix())
+			ms := framework.CloneMachineSetSameSpec(sets[0], newMLName)
+			replicas := int32(newMachineCount)
+			ms.Spec.Replicas = &replicas
+
+			By(fmt.Sprintf("creating %d new machines while %d existing machines are Running", newMachineCount, bgCount))
+			t0 := time.Now()
+			GinkgoWriter.Printf("creating new-machine-latency MachineSet %s with replicas=%d at %s (background: %d Running machines)\n",
+				newMLName, newMachineCount, t0.Format(time.RFC3339), bgCount)
+			_, err := framework.CreateMachineSet(ctx, clients.Machine, ms)
+			Expect(err).NotTo(HaveOccurred(), "create new-machine-latency MachineSet")
+
+			newResult, watchErr := framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, newMLName, newMachineCount, framework.PerfTimeout)
+			Expect(newResult).NotTo(BeNil(), "result must be returned even on partial completion")
+
+			runningCount := 0
+			for _, m := range newResult.Machines {
+				if !m.Running.IsZero() {
+					runningCount++
+				}
+			}
+
+			if watchErr != nil {
+				GinkgoWriter.Printf("WARNING: not all new machines reached Running: %v\n", watchErr)
+				GinkgoWriter.Printf("  %d/%d new machines Running\n", runningCount, newMachineCount)
+			}
+			Expect(runningCount).To(BeNumerically(">", 0), "at least one new machine must reach Running")
+
+			totalDuration := ""
+			if !newResult.AllRunningTime.IsZero() {
+				totalDuration = newResult.AllRunningTime.Sub(t0).String()
+			} else {
+				totalDuration = time.Since(t0).String()
+			}
+
+			nml := &framework.NewMachineLatencyResult{
+				BackgroundMachines: bgCount,
+				NewMachineCount:    newMachineCount,
+				TotalDuration:      totalDuration,
+				Machines:           newResult.Machines,
+			}
+
+			GinkgoWriter.Printf("\n=== New-Machine Latency Under Load ===\n")
+			GinkgoWriter.Printf("Background machines:     %d\n", bgCount)
+			GinkgoWriter.Printf("New machines created:    %d\n", newMachineCount)
+			GinkgoWriter.Printf("New machines Running:    %d\n", runningCount)
+			GinkgoWriter.Printf("Total time:              %s\n", totalDuration)
+			printNewMLSummary(nml, t0)
+
+			result.NewMachineLatency = nml
+			writePerfResults(resultsDir, result)
 		})
 })
+
+func cleanupMachineSet(ctx SpecContext, name string) {
+	GinkgoWriter.Printf("cleanup: releasing DHCP leases for %s\n", name)
+	if err := framework.ReleaseDHCPLeases(ctx, clients.Machine, name, GinkgoWriter.Printf); err != nil {
+		GinkgoWriter.Printf("cleanup: DHCP release failed (best-effort) for %s: %v\n", name, err)
+	}
+	GinkgoWriter.Printf("cleanup: scaling MachineSet %s to 0\n", name)
+	_ = framework.ScaleMachineSet(ctx, clients.Machine, name, 0)
+	err := framework.WaitForMachineSetDrainedWithLog(ctx, clients.Machine, name, 20*time.Minute)
+	if err != nil {
+		GinkgoWriter.Printf("cleanup: drain failed for %s, force-deleting machines: %v\n", name, err)
+		framework.ForceDeleteMachineSetMachines(ctx, clients.Machine, name)
+		_ = framework.WaitForMachineSetDrainedWithDelete(ctx, clients.Machine, name, 10*time.Minute)
+	}
+	_ = framework.DeleteMachineSet(ctx, clients.Machine, name)
+	GinkgoWriter.Printf("cleanup: MachineSet %s deleted\n", name)
+}
+
+func writePerfResults(dir string, result *framework.PerfBenchmarkResult) {
+	Expect(os.MkdirAll(dir, 0o755)).To(Succeed())
+	outPath := filepath.Join(dir, "perf-results.json")
+	data, err := json.MarshalIndent(result, "", "  ")
+	Expect(err).NotTo(HaveOccurred())
+	Expect(os.WriteFile(outPath, data, 0o644)).To(Succeed())
+	GinkgoWriter.Printf("perf results written to %s\n", outPath)
+}
 
 func perfRandomSuffix() string {
 	b := make([]byte, 2)
 	_, _ = rand.Read(b)
 	return fmt.Sprintf("%x", b)
+}
+
+func printNewMLSummary(nml *framework.NewMachineLatencyResult, t0 time.Time) {
+	if len(nml.Machines) == 0 {
+		GinkgoWriter.Printf("no new-machine timing data to summarize\n")
+		return
+	}
+
+	var totals []time.Duration
+	var pendingToProvisioning []time.Duration
+	var provisioningToProvisioned []time.Duration
+	var provisionedToRunning []time.Duration
+
+	GinkgoWriter.Printf("\n%-50s %12s %12s %12s %12s %12s\n",
+		"Machine", "Created+", "Provisioning+", "Provisioned+", "Running+", "Total")
+	GinkgoWriter.Printf("%s\n", "----------------------------------------------------------------------------------------------------------------------------")
+
+	sort.Slice(nml.Machines, func(i, j int) bool {
+		return nml.Machines[i].Created.Before(nml.Machines[j].Created)
+	})
+
+	for _, m := range nml.Machines {
+		if m.Running.IsZero() {
+			continue
+		}
+
+		total := m.Running.Sub(m.Created)
+		totals = append(totals, total)
+
+		createdOffset := m.Created.Sub(t0)
+		provisioningOffset := m.Provisioning.Sub(t0)
+		provisionedOffset := m.Provisioned.Sub(t0)
+		runningOffset := m.Running.Sub(t0)
+
+		if !m.Provisioning.IsZero() {
+			pendingToProvisioning = append(pendingToProvisioning, m.Provisioning.Sub(m.Created))
+		}
+		if !m.Provisioning.IsZero() && !m.Provisioned.IsZero() {
+			provisioningToProvisioned = append(provisioningToProvisioned, m.Provisioned.Sub(m.Provisioning))
+		}
+		if !m.Provisioned.IsZero() {
+			provisionedToRunning = append(provisionedToRunning, m.Running.Sub(m.Provisioned))
+		}
+
+		GinkgoWriter.Printf("%-50s %12s %12s %12s %12s %12s\n",
+			truncateName(m.Name, 50),
+			fmtDuration(createdOffset),
+			fmtDuration(provisioningOffset),
+			fmtDuration(provisionedOffset),
+			fmtDuration(runningOffset),
+			fmtDuration(total))
+	}
+
+	if len(totals) > 0 {
+		GinkgoWriter.Printf("\nPer-machine total latency:\n")
+		GinkgoWriter.Printf("  p50: %s\n", fmtDuration(percentile(totals, 0.50)))
+		if len(totals) >= 5 {
+			GinkgoWriter.Printf("  p90: %s\n", fmtDuration(percentile(totals, 0.90)))
+		}
+	}
+
+	if len(pendingToProvisioning) > 0 {
+		GinkgoWriter.Printf("\nPhase breakdown (p50):\n")
+		GinkgoWriter.Printf("  Pending → Provisioning:      %s\n", fmtDuration(percentile(pendingToProvisioning, 0.50)))
+	}
+	if len(provisioningToProvisioned) > 0 {
+		GinkgoWriter.Printf("  Provisioning → Provisioned:  %s\n", fmtDuration(percentile(provisioningToProvisioned, 0.50)))
+	}
+	if len(provisionedToRunning) > 0 {
+		GinkgoWriter.Printf("  Provisioned → Running:       %s\n", fmtDuration(percentile(provisionedToRunning, 0.50)))
+	}
 }
 
 func printPerfSummary(result *framework.PerfBenchmarkResult) {
