@@ -122,7 +122,36 @@ run_benchmark() {
     cp "$INSTALL_CONFIG_TEMPLATE" install-config.yaml
     export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$release_image"
 
-    if "$INSTALLER_BIN" create cluster --log-level debug 2>&1 | tee "$variant_dir/install.log"; then
+    # Generate manifests first so we can inject a MachineConfig to disable IPv6.
+    # Without this, DHCPv6 DAD failures block ovs-configuration.service on worker
+    # nodes, preventing boot from completing.
+    if ! "$INSTALLER_BIN" create manifests --log-level debug 2>&1 | tee -a "$variant_dir/install.log"; then
+        log "$variant: manifest creation FAILED"
+        echo "INSTALL_FAILED" > "$variant_dir/status"
+        return 1
+    fi
+
+    cat > openshift/99-worker-disable-ipv6.yaml <<'MCEOF'
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-disable-ipv6
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+        - contents:
+            source: data:text/plain;charset=utf-8;base64,W2Nvbm5lY3Rpb25dCmlwdjYubWV0aG9kPWRpc2FibGVkCg==
+          mode: 0644
+          path: /etc/NetworkManager/conf.d/99-disable-ipv6.conf
+MCEOF
+    log "$variant: injected IPv6-disable MachineConfig for workers"
+
+    if "$INSTALLER_BIN" create cluster --log-level debug 2>&1 | tee -a "$variant_dir/install.log"; then
         log "$variant: cluster created successfully"
     else
         log "$variant: cluster creation FAILED"
