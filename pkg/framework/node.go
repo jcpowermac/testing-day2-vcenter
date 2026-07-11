@@ -47,7 +47,7 @@ func ReleaseDHCPLeases(ctx context.Context, machineClient machineclient.Interfac
 		released int
 	)
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 10)
+	sem := make(chan struct{}, 20)
 
 	for _, node := range nodes {
 		wg.Add(1)
@@ -76,10 +76,9 @@ func ReleaseDHCPLeases(ctx context.Context, machineClient machineclient.Interfac
 }
 
 func releaseDHCPOnNode(ctx context.Context, nodeName string) error {
-	// 90s is enough for pod scheduling + command execution. After nmcli
-	// brings down the interface the node loses network and oc debug hangs
-	// waiting for pod cleanup — the timeout kills it, which is fine.
-	nodeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	// The command takes <10s. After nmcli brings down the interface oc debug
+	// hangs waiting for kubelet — the timeout kills it, which is fine.
+	nodeCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	var stderr bytes.Buffer
