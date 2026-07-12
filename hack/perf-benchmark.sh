@@ -97,9 +97,13 @@ run_benchmark() {
     mkdir -p "$variant_dir"
 
     # Resume support: skip if this variant already has perf-results.json
-    if [[ "$FORCE" != "true" ]] && [[ -f "$variant_dir/perf-results.json" ]]; then
-        log "=== $variant: already has results, skipping (use --force to re-run) ==="
-        return 0
+    if [[ -f "$variant_dir/perf-results.json" ]]; then
+        if [[ "$FORCE" != "true" ]]; then
+            log "=== $variant: already has results, skipping (use --force to re-run) ==="
+            return 0
+        fi
+        log "$variant: --force: removing stale results"
+        rm -f "$variant_dir/perf-results.json" "$variant_dir/status" "$variant_dir/test-exit-code"
     fi
 
     log "=== $variant: starting ==="
