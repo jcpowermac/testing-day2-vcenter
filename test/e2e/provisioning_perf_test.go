@@ -83,7 +83,8 @@ var _ = Describe("Provisioning performance benchmark", Ordered, Label("perf", "m
 			_, err := framework.CreateMachineSet(suiteCtx, clients.Machine, ms)
 			Expect(err).NotTo(HaveOccurred(), "create benchmark MachineSet")
 
-			result, watchErr := framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, msName, workerCount, framework.PerfTimeout)
+			var watchErr error
+			result, watchErr = framework.WatchMachinePhaseTimestamps(ctx, clients.Machine, msName, workerCount, framework.PerfTimeout)
 			Expect(result).NotTo(BeNil(), "result must be returned even on partial completion")
 
 			runningCount := 0
