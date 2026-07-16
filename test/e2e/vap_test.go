@@ -1,6 +1,9 @@
 package e2e
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/jcallen/testing-day2-vcenter/pkg/framework"
 	configv1 "github.com/openshift/api/config/v1"
 	. "github.com/onsi/ginkgo/v2"
@@ -12,6 +15,42 @@ var _ = Describe("ValidatingAdmissionPolicies", Label("readonly", "admission", "
 	Context("when VSphereMultiVCenterDay2 is enabled", func() {
 		BeforeEach(func() {
 			requireGateEnabled()
+		})
+
+		// SPLAT-2854: VAP constructors that omit server-defaulted fields
+		// (MatchPolicy, NamespaceSelector, ObjectSelector) cause resourceapply
+		// to see a diff on every sync cycle, triggering spurious updates.
+		// After the fix, resourceVersion must be stable across sync cycles.
+		It("should not update VAPs on every sync cycle (SPLAT-2854)", Label("p1"), func() {
+			vapNames := []string{
+				framework.VAPMachineFailureDomainName,
+				framework.VAPCPMSFailureDomainName,
+				framework.VAPMachineSetFailureDomainName,
+			}
+
+			initialVersions := make(map[string]string, len(vapNames))
+			for _, name := range vapNames {
+				vap, err := clients.Kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(suiteCtx, name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred(), "VAP %q should exist", name)
+				initialVersions[name] = vap.ResourceVersion
+				GinkgoWriter.Printf("VAP %s initial resourceVersion=%s\n", name, vap.ResourceVersion)
+			}
+
+			// MAO syncs every ~5s during active reconciliation.
+			// Wait 30s to cover ~6 sync cycles — enough to detect spurious updates.
+			syncCycles := 6
+			syncInterval := 5 * time.Second
+			wait := time.Duration(syncCycles) * syncInterval
+			GinkgoWriter.Printf("waiting %s (%d sync cycles) for resourceVersion stability\n", wait, syncCycles)
+			time.Sleep(wait)
+
+			for _, name := range vapNames {
+				vap, err := clients.Kube.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(suiteCtx, name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vap.ResourceVersion).To(Equal(initialVersions[name]),
+					fmt.Sprintf("VAP %s resourceVersion changed from %s to %s — spurious update detected (SPLAT-2854)",
+						name, initialVersions[name], vap.ResourceVersion))
+			}
 		})
 
 		It("should install vSphere failure domain VAP resources", func() {
