@@ -37,6 +37,7 @@
 | [N-SEQ-03](tests/N-SEQ-03.md) | Create 1-replica MachineSet, wait for Machine, removing its FD denied by VAP | cluster-config-operator | MAO#1510 |
 | [N-SEQ-06](tests/N-SEQ-06.md) | Dry-run probes each FD to find one the API accepts for removal | cluster-config-operator | MAO#1510 |
 | [N-SEQ-07](tests/N-SEQ-07.md) | Gate-off: Machine VAP is absent | cluster-config-operator | MAO#1510 |
+| [N-SEQ-08](tests/N-SEQ-08.md) | VAP resourceVersion stable across sync cycles (no spurious updates) | machine-api-operator | MAO#1518, SPLAT-2854 |
 
 ## Cloud Config Content (`configmap_content_test.go`) [readonly, config, p0]
 
@@ -227,3 +228,4 @@ test (OBS-03 analog) are deferred — see `plans/new-csi-operator-test-topology-
 | VPD#224 | [openshift/vsphere-problem-detector#224](https://github.com/openshift/vsphere-problem-detector/pull/224) | OCPBUGS-87906 | Fixed GetVCenter to handle removed FDs better |
 | csi-op#348 | [openshift/vmware-vsphere-csi-driver-operator#348](https://github.com/openshift/vmware-vsphere-csi-driver-operator/pull/348) | | FD lifecycle: orphan tag cleanup, SPBM profile management, PV-safe detach |
 | MAO#1515 | [openshift/machine-api-operator#1515](https://github.com/openshift/machine-api-operator/pull/1515) | | Reduce vCenter API load for large vSphere clusters |
+| MAO#1518 | [openshift/machine-api-operator#1518](https://github.com/openshift/machine-api-operator/pull/1518) | SPLAT-2854 | Fixing issue related to unintended VAP interactions |
